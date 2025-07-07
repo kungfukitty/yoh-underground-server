@@ -2,7 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import authRoutes from './routes/authRoutes.js';
+// Corrected: The import path for authRoutes no longer includes the non-existent 'routes' folder.
+import authRoutes from './authRoutes.js';
 
 // --- Corrected method for loading JSON in ES Modules ---
 import { readFileSync } from 'fs';
