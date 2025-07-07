@@ -2,17 +2,33 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-
-// It's better to import the service account key directly from the JSON file.
-// Make sure the path is correct for your project structure.
-import serviceAccount from './yoh-underground-firebase-adminsdk-fbsvc-5f9002319c.json' assert { type: 'json' };
-
 import authRoutes from './routes/authRoutes.js';
+
+// --- Corrected method for loading JSON in ES Modules ---
+import { readFileSync } from 'fs';
+const serviceAccount = JSON.parse(readFileSync('./yoh-underground-firebase-adminsdk-fbsvc-5f9002319c.json'));
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// --- CORS Configuration ---
+const allowedOrigins = [
+    'http://localhost:56612',
+    'http://yohunderground.fun',
+    'https://yohunderground.fun'
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
+};
 
 // Initialize Firebase Admin SDK
 try {
@@ -24,7 +40,8 @@ try {
     console.error("Error initializing Firebase Admin SDK:", error.message);
 }
 
-app.use(cors());
+// Use the CORS options middleware
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get('/', (req, res) => {
