@@ -1,0 +1,16 @@
+### Claim Access Code
+POST http://localhost:5000/api/auth/claim-code
+Content-Type: application/json
+
+{
+  "accessCode": "TEST-CODE-123",
+  "password": "newSecurePassword123"
+}
+### Standard Member Login
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "sterling@example.com",
+  "password": "newSecurePassword123"
+}
