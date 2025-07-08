@@ -4,41 +4,33 @@ import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import authRoutes from './authRoutes.js';
 
-// --- Final Fix: Read the service account from the secret file path ---
-import { readFileSync } from 'fs';
-const serviceAccountPath = '/etc/secrets/firebase_key.json';
-let serviceAccount;
-
-try {
-    serviceAccount = JSON.parse(readFileSync(serviceAccountPath));
-} catch (error) {
-    console.error('FATAL ERROR: Could not read or parse the Firebase service account file from path.', error);
-    process.exit(1); // Exit if the key cannot be read
-}
-
 dotenv.config();
+
+// --- Final Fix: Reconstruct the service account from individual environment variables ---
+const serviceAccount = {
+  type: process.env.FIREBASE_TYPE,
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  // The private_key from the JSON file must be pasted into the environment variable.
+  // This code will handle the formatting correctly.
+  private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: process.env.FIREBASE_AUTH_URI,
+  token_uri: process.env.FIREBASE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
+  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
+};
+
+// Check if the essential variables are present
+if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
+    console.error('FATAL ERROR: Missing required Firebase environment variables.');
+    process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 10000;
-
-// --- CORS Configuration ---
-const allowedOrigins = [
-    'http://localhost:56612',
-    'http://yohunderground.fun',
-    'https://yohunderground.fun',
-    'http://www.yohunderground.fun',
-    'https://www.yohunderground.fun'
-];
-
-const corsOptions = {
-    origin: function (origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    }
-};
 
 // Initialize Firebase Admin SDK
 try {
@@ -48,9 +40,10 @@ try {
     console.log("Firebase Admin SDK initialized successfully.");
 } catch (error) {
     console.error("Error initializing Firebase Admin SDK:", error);
+    process.exit(1);
 }
 
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
