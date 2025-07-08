@@ -2,17 +2,20 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-// **FIX**: The import path for authRoutes no longer includes a 'routes' folder.
 import authRoutes from './authRoutes.js';
-
-// --- Corrected method for loading JSON in ES Modules ---
-import { readFileSync } from 'fs';
-const serviceAccount = JSON.parse(readFileSync('./yoh-underground-firebase-adminsdk-fbsvc-5f9002319c.json'));
 
 dotenv.config();
 
+// --- Read the service account from the environment variable ---
+const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+if (!serviceAccountString) {
+    console.error('FATAL ERROR: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+    process.exit(1); // Exit if the key is not found
+}
+const serviceAccount = JSON.parse(serviceAccountString);
+
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 
 // --- CORS Configuration ---
 const allowedOrigins = [
@@ -43,7 +46,6 @@ try {
     console.error("Error initializing Firebase Admin SDK:", error);
 }
 
-// Use the CORS options middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 
