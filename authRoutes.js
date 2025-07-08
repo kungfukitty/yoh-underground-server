@@ -7,7 +7,14 @@ const router = Router();
 
 // This function generates a JSON Web Token for an authenticated user.
 const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
+    // Ensure the JWT_SECRET is available
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
+        // In a real application, you might want to throw an error or handle this differently
+        return null;
+    }
+    return jwt.sign({ id: userId }, secret, { expiresIn: '24h' });
 };
 
 // Route for activating a new account with an access code.
@@ -49,6 +56,9 @@ router.post('/claim-code', async (req, res) => {
         });
 
         const token = generateToken(userId);
+        if (!token) {
+            return res.status(500).json({ message: 'Server configuration error: Could not generate token.' });
+        }
         res.status(200).json({ message: 'Account activated successfully.', token });
 
     } catch (error) {
@@ -91,6 +101,9 @@ router.post('/login', async (req, res) => {
         }
 
         const token = generateToken(userId);
+        if (!token) {
+            return res.status(500).json({ message: 'Server configuration error: Could not generate token.' });
+        }
         res.status(200).json({
             message: 'Login successful.',
             token,
