@@ -2,7 +2,6 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-// Corrected: The import path for authRoutes no longer includes the non-existent 'routes' folder.
 import authRoutes from './authRoutes.js';
 
 // --- Corrected method for loading JSON in ES Modules ---
@@ -15,19 +14,24 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // --- CORS Configuration ---
+// Define which origins are allowed to connect to this server.
 const allowedOrigins = [
-    'http://localhost:56612',
-    'http://yohunderground.fun',
-    'https://yohunderground.fun'
+    'http://localhost:56612',      // Your local development frontend
+    'http://yohunderground.fun',   // Deployed frontend
+    'https://yohunderground.fun',
+    'http://www.yohunderground.fun',  // **FIX**: Added the 'www' subdomain
+    'https://www.yohunderground.fun'
 ];
 
 const corsOptions = {
     origin: function (origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
         }
+        return callback(null, true);
     }
 };
 
