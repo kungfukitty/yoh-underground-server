@@ -1,57 +1,105 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import admin from 'firebase-admin';
-import authRoutes from './authRoutes.js';
+import React, { useState } from 'react';
 
-dotenv.config();
+// Define the shape of the user data returned from the API
+interface User {
+    id: string;
+    name: string;
+    email: string;
+}
 
-// --- Final Fix: Reconstruct the service account from individual environment variables ---
-const serviceAccount = {
-  type: process.env.FIREBASE_TYPE,
-  project_id: process.env.FIREBASE_PROJECT_ID,
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  // The private_key from the JSON file must be pasted into the environment variable.
-  // This code will handle the formatting correctly.
-  private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: process.env.FIREBASE_AUTH_URI,
-  token_uri: process.env.FIREBASE_TOKEN_URI,
-  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
-  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
+// Update props to include the navigation function
+interface AuthScreenProps {
+    onLoginSuccess: (user: User, token: string) => void;
+    onNavigateToClaim: () => void;
+}
+
+const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess, onNavigateToClaim }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Updated API URL to point to the new Vercel deployment
+    const API_URL = 'https://yoh-underground-server.vercel.app/api/auth/login';
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Authentication failed.');
+            }
+
+            onLoginSuccess(data.user, data.token);
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            setError(errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+            <div className="w-full max-w-sm text-center">
+                <form onSubmit={handleSubmit} className="p-10 border border-gray-700 rounded-lg shadow-xl bg-gray-800/50 backdrop-blur-sm">
+                    <h1 className="text-5xl font-serif text-accent-gold mb-4">YOH</h1>
+                    <p className="text-gray-400 mb-8">Secure Access Portal</p>
+                    
+                    <div className="space-y-4 mb-6">
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Email Address"
+                            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:border-accent-gold focus:outline-none"
+                            required
+                        />
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Password"
+                            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:border-accent-gold focus:outline-none"
+                            required
+                        />
+                    </div>
+
+                    {error && <p className="text-red-500 mb-4">{error}</p>}
+
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 px-4 rounded-md text-lg transition-all duration-300 bg-accent-gold text-black hover:bg-opacity-80 focus:outline-none focus:ring-2 focus:ring-accent-gold focus:ring-opacity-50 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? 'Authenticating...' : 'Authenticate'}
+                    </button>
+                </form>
+
+                <div className="mt-6">
+                    <button
+                        onClick={onNavigateToClaim}
+                        className="text-sm text-gray-400 hover:text-accent-gold hover:underline"
+                    >
+                        Have an access code? Activate account.
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
-// Check if the essential variables are present
-if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
-    console.error('FATAL ERROR: Missing required Firebase environment variables.');
-    process.exit(1);
-}
-
-const app = express();
-const PORT = process.env.PORT || 10000;
-
-// Initialize Firebase Admin SDK
-try {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-    console.log("Firebase Admin SDK initialized successfully.");
-} catch (error) {
-    console.error("Error initializing Firebase Admin SDK:", error);
-    process.exit(1);
-}
-
-app.use(cors());
-app.use(express.json());
-
-app.get('/', (req, res) => {
-    res.status(200).json({ message: "YOH Underground Server is operational." });
-});
-
-app.use('/api/auth', authRoutes);
-
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+export default AuthScreen;
