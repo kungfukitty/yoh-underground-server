@@ -2,9 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import authRoutes from './authRoutes.js';
+// Use the explicit import syntax for robustness
+import { default as authRoutes } from './authRoutes.js';
 
-// --- Final Fix: Read the service account from the secret file path ---
+// --- Read the service account from the secret file path ---
 import { readFileSync } from 'fs';
 const serviceAccountPath = '/etc/secrets/firebase_key.json';
 let serviceAccount;
@@ -12,8 +13,14 @@ let serviceAccount;
 try {
     serviceAccount = JSON.parse(readFileSync(serviceAccountPath));
 } catch (error) {
-    console.error('FATAL ERROR: Could not read or parse the Firebase service account file.', error);
-    process.exit(1); // Exit if the key cannot be read
+    // If reading from the secret file fails, try the environment variable as a fallback
+    console.warn('Could not read secret file, trying environment variable...');
+    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (!serviceAccountString) {
+        console.error('FATAL ERROR: Firebase credentials not found in secret file or environment variable.');
+        process.exit(1); // Exit if the key is not found
+    }
+    serviceAccount = JSON.parse(serviceAccountString);
 }
 
 dotenv.config();
