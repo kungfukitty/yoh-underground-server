@@ -4,34 +4,36 @@ import dotenv from 'dotenv';
 import admin from 'firebase-admin';
 import authRoutes from './authRoutes.js';
 
-// --- Corrected method for loading JSON in ES Modules ---
-import { readFileSync } from 'fs';
-const serviceAccount = JSON.parse(readFileSync('./yoh-underground-firebase-adminsdk-fbsvc-5f9002319c.json'));
-
 dotenv.config();
 
+// --- Final Fix: Read the service account from the environment variable ---
+const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
+if (!serviceAccountString) {
+    console.error('FATAL ERROR: FIREBASE_SERVICE_ACCOUNT environment variable is not set.');
+    process.exit(1); // Exit if the key is not found
+}
+const serviceAccount = JSON.parse(serviceAccountString);
+
 const app = express();
-const PORT = process.env.PORT || 5000;
+// Render dynamically assigns the port, so we use process.env.PORT
+const PORT = process.env.PORT || 10000;
 
 // --- CORS Configuration ---
-// Define which origins are allowed to connect to this server.
 const allowedOrigins = [
-    'http://localhost:56612',      // Your local development frontend
-    'http://yohunderground.fun',   // Deployed frontend
+    'http://localhost:56612',
+    'http://yohunderground.fun',
     'https://yohunderground.fun',
-    'http://www.yohunderground.fun',  // **FIX**: Added the 'www' subdomain
+    'http://www.yohunderground.fun',
     'https://www.yohunderground.fun'
 ];
 
 const corsOptions = {
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-            return callback(new Error(msg), false);
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
         }
-        return callback(null, true);
     }
 };
 
@@ -42,10 +44,9 @@ try {
     });
     console.log("Firebase Admin SDK initialized successfully.");
 } catch (error) {
-    console.error("Error initializing Firebase Admin SDK:", error.message);
+    console.error("Error initializing Firebase Admin SDK:", error);
 }
 
-// Use the CORS options middleware
 app.use(cors(corsOptions));
 app.use(express.json());
 
