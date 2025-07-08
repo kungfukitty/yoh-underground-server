@@ -1,106 +1,64 @@
-import { Router } from 'express';
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import authRoutes from './authRoutes.js';
 
-const router = Router();
+// --- Final Fix: Read the service account from the secret file path ---
+import { readFileSync } from 'fs';
+const serviceAccountPath = '/etc/secrets/firebase_key.json';
+let serviceAccount;
 
-// This function generates a JSON Web Token for an authenticated user.
-const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
+try {
+    serviceAccount = JSON.parse(readFileSync(serviceAccountPath));
+} catch (error) {
+    console.error('FATAL ERROR: Could not read or parse the Firebase service account file.', error);
+    process.exit(1); // Exit if the key cannot be read
+}
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 10000;
+
+// --- CORS Configuration ---
+const allowedOrigins = [
+    'http://localhost:56612',
+    'http://yohunderground.fun',
+    'https://yohunderground.fun',
+    'http://www.yohunderground.fun',
+    'https://www.yohunderground.fun'
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
 };
 
-// Route for activating a new account with an access code.
-router.post('/claim-code', async (req, res) => {
-    const db = admin.firestore();
-    const { accessCode, password } = req.body;
+// Initialize Firebase Admin SDK
+try {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount)
+    });
+    console.log("Firebase Admin SDK initialized successfully.");
+} catch (error) {
+    console.error("Error initializing Firebase Admin SDK:", error);
+}
 
-    if (!accessCode || !password) {
-        return res.status(400).json({ message: 'Access code and password are required.' });
-    }
+app.use(cors(corsOptions));
+app.use(express.json());
 
-    try {
-        const usersRef = db.collection('users');
-        const snapshot = await usersRef.where('accessCode', '==', accessCode).limit(1).get();
-
-        if (snapshot.empty) {
-            return res.status(404).json({ message: 'Invalid or expired access code.' });
-        }
-
-        let userId, userData;
-        snapshot.forEach(doc => {
-            userId = doc.id;
-            userData = doc.data();
-        });
-
-        if (userData.isClaimed) {
-            return res.status(400).json({ message: 'Access code has already been used.' });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        const userDocRef = usersRef.doc(userId);
-        await userDocRef.update({
-            password: hashedPassword,
-            isClaimed: true,
-            accessCode: admin.firestore.FieldValue.delete(),
-            activatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        const token = generateToken(userId);
-        res.status(200).json({ message: 'Account activated successfully.', token });
-
-    } catch (error) {
-        console.error('Error claiming access code:', error);
-        res.status(500).json({ message: 'Server error during account activation.' });
-    }
+app.get('/', (req, res) => {
+    res.status(200).json({ message: "YOH Underground Server is operational." });
 });
 
-// Route for logging in an existing user.
-router.post('/login', async (req, res) => {
-    const db = admin.firestore();
-    const { email, password } = req.body;
+app.use('/api/auth', authRoutes);
 
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required.' });
-    }
-
-    try {
-        const usersRef = db.collection('users');
-        const snapshot = await usersRef.where('email', '==', email).limit(1).get();
-
-        if (snapshot.empty) {
-            return res.status(401).json({ message: 'Invalid credentials.' });
-        }
-
-        let userId, userData;
-        snapshot.forEach(doc => {
-            userId = doc.id;
-            userData = doc.data();
-        });
-
-        if (!userData.password) {
-            return res.status(401).json({ message: 'Account not yet activated.' });
-        }
-
-        const isMatch = await bcrypt.compare(password, userData.password);
-
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid credentials.' });
-        }
-
-        const token = generateToken(userId);
-        res.status(200).json({
-            message: 'Login successful.',
-            token,
-            user: { id: userId, name: userData.name, email: userData.email }
-        });
-
-    } catch (error) {
-        console.error('Error during login:', error);
-        res.status(500).json({ message: 'Server error during login.' });
-    }
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
 });
-
-export default router;
