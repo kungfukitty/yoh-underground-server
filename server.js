@@ -5,20 +5,21 @@ import admin from 'firebase-admin';
 // Use the explicit import syntax for robustness
 import { default as authRoutes } from './authRoutes.js';
 
-// --- Read the service account from the secret file path ---
+// --- Read the service account credentials ---
 import { readFileSync } from 'fs';
 const serviceAccountPath = '/etc/secrets/firebase_key.json';
 let serviceAccount;
 
 try {
+    // First, try to read from the secret file (recommended for Render)
     serviceAccount = JSON.parse(readFileSync(serviceAccountPath));
 } catch (error) {
-    // If reading from the secret file fails, try the environment variable as a fallback
+    // If the secret file fails, fall back to the environment variable
     console.warn('Could not read secret file, trying environment variable...');
     const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
     if (!serviceAccountString) {
         console.error('FATAL ERROR: Firebase credentials not found in secret file or environment variable.');
-        process.exit(1); // Exit if the key is not found
+        process.exit(1); // Exit if no credentials can be found
     }
     serviceAccount = JSON.parse(serviceAccountString);
 }
