@@ -2,7 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import authRoutes from './authRoutes.js';
+// **FIX**: Changed the import syntax for authRoutes to be more explicit.
+import { default as authRoutes } from './authRoutes.js';
 
 dotenv.config();
 
