@@ -2,8 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import { default as authRoutes } from './authRoutes.js';
+import authRoutes from './authRoutes.js';
 
+// --- Final Fix: Read the service account from the secret file path ---
 import { readFileSync } from 'fs';
 const serviceAccountPath = '/etc/secrets/firebase_key.json';
 let serviceAccount;
@@ -11,13 +12,8 @@ let serviceAccount;
 try {
     serviceAccount = JSON.parse(readFileSync(serviceAccountPath));
 } catch (error) {
-    console.warn('Could not read secret file, trying environment variable...');
-    const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-    if (!serviceAccountString) {
-        console.error('FATAL ERROR: Firebase credentials not found in secret file or environment variable.');
-        process.exit(1);
-    }
-    serviceAccount = JSON.parse(serviceAccountString);
+    console.error('FATAL ERROR: Could not read or parse the Firebase service account file from path.', error);
+    process.exit(1); // Exit if the key cannot be read
 }
 
 dotenv.config();
@@ -25,7 +21,26 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// --- Initialize Firebase Admin SDK ---
+// --- CORS Configuration ---
+const allowedOrigins = [
+    'http://localhost:56612',
+    'http://yohunderground.fun',
+    'https://yohunderground.fun',
+    'http://www.yohunderground.fun',
+    'https://www.yohunderground.fun'
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    }
+};
+
+// Initialize Firebase Admin SDK
 try {
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
@@ -35,10 +50,7 @@ try {
     console.error("Error initializing Firebase Admin SDK:", error);
 }
 
-// --- CORS Configuration FIX ---
-// This is a more permissive setting to ensure the connection works.
-// It allows requests from any origin.
-app.use(cors()); 
+app.use(cors(corsOptions));
 app.use(express.json());
 
 app.get('/', (req, res) => {
