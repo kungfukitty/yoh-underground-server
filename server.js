@@ -2,60 +2,45 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import authRoutes from './authRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
-
-// --- Final Fix: Read the service account from the environment variable ---
-const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT;
-if (!serviceAccountString) {
-    console.error('FATAL ERROR: FIREBASE_SERVICE_ACCOUNT environment variable is not set.');
-    process.exit(1); // Exit if the key is not found
-}
-const serviceAccount = JSON.parse(serviceAccountString);
-
 const app = express();
-// Render dynamically assigns the port, so we use process.env.PORT
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 5000;
 
-// --- CORS Configuration ---
-const allowedOrigins = [
-    'http://localhost:56612',
-    'http://yohunderground.fun',
-    'https://yohunderground.fun',
-    'http://www.yohunderground.fun',
-    'https://www.yohunderground.fun'
-];
-
-const corsOptions = {
-    origin: function (origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    }
-};
-
-// Initialize Firebase Admin SDK
 try {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-    console.log("Firebase Admin SDK initialized successfully.");
+  // Get the Base64 encoded service account string from environment variables
+  const encodedServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+
+  if (!encodedServiceAccount) {
+    throw new Error("FIREBASE_SERVICE_ACCOUNT environment variable is not set or is empty.");
+  }
+
+  // Decode the Base64 string and then parse it as JSON
+  const serviceAccount = JSON.parse(Buffer.from(encodedServiceAccount, 'base64').toString('utf8'));
+
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  console.log("Firebase Admin SDK initialized successfully.");
 } catch (error) {
-    console.error("Error initializing Firebase Admin SDK:", error);
+  console.error("Error initializing Firebase Admin SDK:", error.message);
+  console.log("Please ensure you have a valid FIREBASE_SERVICE_ACCOUNT (Base64 encoded) environment variable in Render.");
 }
 
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
-    res.status(200).json({ message: "YOH Underground Server is operational." });
+  res.status(200).json({
+    message: "YOH Underground Server is operational.",
+    status: "OK",
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.use('/api/auth', authRoutes);
 
 app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
