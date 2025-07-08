@@ -1,103 +1,105 @@
-import { Router } from 'express';
-import admin from 'firebase-admin';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import React, { useState } from 'react';
 
-const router = Router();
+// Define the shape of the user data returned from the API
+interface User {
+    id: string;
+    name: string;
+    email: string;
+}
 
-const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
+// Update props to include the navigation function
+interface AuthScreenProps {
+    onLoginSuccess: (user: User, token: string) => void;
+    onNavigateToClaim: () => void;
+}
+
+const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess, onNavigateToClaim }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Updated API URL to point to the new Vercel deployment
+    const API_URL = 'https://yoh-underground-server.vercel.app/api/auth/login';
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email, password }),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Authentication failed.');
+            }
+
+            onLoginSuccess(data.user, data.token);
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            setError(errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
+            <div className="w-full max-w-sm text-center">
+                <form onSubmit={handleSubmit} className="p-10 border border-gray-700 rounded-lg shadow-xl bg-gray-800/50 backdrop-blur-sm">
+                    <h1 className="text-5xl font-serif text-accent-gold mb-4">YOH</h1>
+                    <p className="text-gray-400 mb-8">Secure Access Portal</p>
+                    
+                    <div className="space-y-4 mb-6">
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Email Address"
+                            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:border-accent-gold focus:outline-none"
+                            required
+                        />
+                        <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Password"
+                            className="w-full p-3 bg-gray-700 rounded-md border border-gray-600 focus:border-accent-gold focus:outline-none"
+                            required
+                        />
+                    </div>
+
+                    {error && <p className="text-red-500 mb-4">{error}</p>}
+
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 px-4 rounded-md text-lg transition-all duration-300 bg-accent-gold text-black hover:bg-opacity-80 focus:outline-none focus:ring-2 focus:ring-accent-gold focus:ring-opacity-50 disabled:bg-gray-500 disabled:cursor-not-allowed"
+                    >
+                        {isLoading ? 'Authenticating...' : 'Authenticate'}
+                    </button>
+                </form>
+
+                <div className="mt-6">
+                    <button
+                        onClick={onNavigateToClaim}
+                        className="text-sm text-gray-400 hover:text-accent-gold hover:underline"
+                    >
+                        Have an access code? Activate account.
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
-router.post('/claim-code', async (req, res) => {
-    const db = admin.firestore();
-    const { accessCode, password } = req.body;
-
-    if (!accessCode || !password) {
-        return res.status(400).json({ message: 'Access code and password are required.' });
-    }
-
-    try {
-        const usersRef = db.collection('users');
-        const snapshot = await usersRef.where('accessCode', '==', accessCode).limit(1).get();
-
-        if (snapshot.empty) {
-            return res.status(404).json({ message: 'Invalid or expired access code.' });
-        }
-
-        let userId, userData;
-        snapshot.forEach(doc => {
-            userId = doc.id;
-            userData = doc.data();
-        });
-
-        if (userData.isClaimed) {
-            return res.status(400).json({ message: 'Access code has already been used.' });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        const userDocRef = usersRef.doc(userId);
-        await userDocRef.update({
-            password: hashedPassword,
-            isClaimed: true,
-            accessCode: admin.firestore.FieldValue.delete(),
-            activatedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-        const token = generateToken(userId);
-        res.status(200).json({ message: 'Account activated successfully.', token });
-
-    } catch (error) {
-        console.error('Error claiming access code:', error);
-        res.status(500).json({ message: 'Server error during account activation.' });
-    }
-});
-
-router.post('/login', async (req, res) => {
-    const db = admin.firestore();
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-        return res.status(400).json({ message: 'Email and password are required.' });
-    }
-
-    try {
-        const usersRef = db.collection('users');
-        const snapshot = await usersRef.where('email', '==', email).limit(1).get();
-
-        if (snapshot.empty) {
-            return res.status(401).json({ message: 'Invalid credentials.' });
-        }
-
-        let userId, userData;
-        snapshot.forEach(doc => {
-            userId = doc.id;
-            userData = doc.data();
-        });
-
-        if (!userData.password) {
-            return res.status(401).json({ message: 'Account not yet activated.' });
-        }
-
-        const isMatch = await bcrypt.compare(password, userData.password);
-
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Invalid credentials.' });
-        }
-
-        const token = generateToken(userId);
-        res.status(200).json({
-            message: 'Login successful.',
-            token,
-            user: { id: userId, name: userData.name, email: userData.email }
-        });
-
-    } catch (error) {
-        console.error('Error during login:', error);
-        res.status(500).json({ message: 'Server error during login.' });
-    }
-});
-
-export default router;
+export default AuthScreen;
