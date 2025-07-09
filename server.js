@@ -8,20 +8,19 @@ dotenv.config();
 
 // --- Final Fix: Read the entire service account JSON from a single environment variable ---
 const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+let serviceAccount;
 
 if (!serviceAccountString) {
-    console.error('FATAL ERROR: The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set.');
-    // In a serverless environment, we need to handle this gracefully.
-    // This will ensure Vercel doesn't crash the entire function immediately.
+    console.error('FATAL ERROR: The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set or is empty.');
+    process.exit(1); // Exit if the variable is not found
 }
 
-let serviceAccount;
 try {
     serviceAccount = JSON.parse(serviceAccountString);
 } catch (error) {
-    console.error('FATAL ERROR: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Make sure it is a valid JSON string.', error);
+    console.error('FATAL ERROR: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Make sure it is a valid JSON string without extra quotes.', error);
+    process.exit(1); // Exit if parsing fails
 }
-
 
 // Initialize Firebase Admin SDK only if it hasn't been initialized already.
 // This is a best practice for serverless environments.
@@ -33,6 +32,7 @@ if (!admin.apps.length) {
         console.log("Firebase Admin SDK initialized successfully.");
     } catch (error) {
         console.error("Error initializing Firebase Admin SDK:", error);
+        process.exit(1);
     }
 }
 
