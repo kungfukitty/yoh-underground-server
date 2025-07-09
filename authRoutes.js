@@ -5,9 +5,7 @@ import jwt from 'jsonwebtoken';
 
 const router = Router();
 
-// This function generates a JSON Web Token for an authenticated user.
 const generateToken = (userId) => {
-    // Ensure the JWT_SECRET is available
     const secret = process.env.JWT_SECRET;
     if (!secret) {
         console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
@@ -16,7 +14,6 @@ const generateToken = (userId) => {
     return jwt.sign({ id: userId }, secret, { expiresIn: '24h' });
 };
 
-// Route for activating a new account with an access code.
 router.post('/claim-code', async (req, res) => {
     const db = admin.firestore();
     const { accessCode, password } = req.body;
@@ -27,7 +24,18 @@ router.post('/claim-code', async (req, res) => {
 
     try {
         const usersRef = db.collection('users');
-        const snapshot = await usersRef.where('accessCode', '==', accessCode).limit(1).get();
+        
+        // --- FINAL FIX: Search for the code with and without quotes ---
+        const plainCodeQuery = usersRef.where('accessCode', '==', accessCode).limit(1);
+        const quotedCodeQuery = usersRef.where('accessCode', '==', `"${accessCode}"`).limit(1);
+
+        const [plainSnapshot, quotedSnapshot] = await Promise.all([
+            plainCodeQuery.get(),
+            quotedCodeQuery.get()
+        ]);
+
+        const snapshot = !plainSnapshot.empty ? plainSnapshot : quotedSnapshot;
+        // --- End of Fix ---
 
         if (snapshot.empty) {
             return res.status(404).json({ message: 'Invalid or expired access code.' });
@@ -66,7 +74,6 @@ router.post('/claim-code', async (req, res) => {
     }
 });
 
-// Route for logging in an existing user.
 router.post('/login', async (req, res) => {
     const db = admin.firestore();
     const { email, password } = req.body;
