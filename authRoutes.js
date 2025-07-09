@@ -18,6 +18,11 @@ router.post('/claim-code', async (req, res) => {
     const db = admin.firestore();
     const { accessCode, password } = req.body;
 
+    // --- DIAGNOSTIC LOGGING ---
+    console.log(`[DIAGNOSTIC] Received request to claim code.`);
+    console.log(`[DIAGNOSTIC] Access Code from Frontend: '${accessCode}'`);
+    // ---
+
     if (!accessCode || !password) {
         return res.status(400).json({ message: 'Access code and password are required.' });
     }
@@ -25,7 +30,6 @@ router.post('/claim-code', async (req, res) => {
     try {
         const usersRef = db.collection('users');
         
-        // --- FINAL FIX: Search for the code with and without quotes ---
         const plainCodeQuery = usersRef.where('accessCode', '==', accessCode).limit(1);
         const quotedCodeQuery = usersRef.where('accessCode', '==', `"${accessCode}"`).limit(1);
 
@@ -34,10 +38,15 @@ router.post('/claim-code', async (req, res) => {
             quotedCodeQuery.get()
         ]);
 
+        // --- DIAGNOSTIC LOGGING ---
+        console.log(`[DIAGNOSTIC] Plain query for '${accessCode}' found ${plainSnapshot.size} documents.`);
+        console.log(`[DIAGNOSTIC] Quoted query for '"${accessCode}"' found ${quotedSnapshot.size} documents.`);
+        // ---
+
         const snapshot = !plainSnapshot.empty ? plainSnapshot : quotedSnapshot;
-        // --- End of Fix ---
 
         if (snapshot.empty) {
+            console.log('[DIAGNOSTIC] Both queries returned empty. Sending 404 error.');
             return res.status(404).json({ message: 'Invalid or expired access code.' });
         }
 
@@ -45,6 +54,7 @@ router.post('/claim-code', async (req, res) => {
         snapshot.forEach(doc => {
             userId = doc.id;
             userData = doc.data();
+            console.log(`[DIAGNOSTIC] Found user: ${userId} with data:`, JSON.stringify(userData));
         });
 
         if (userData.isClaimed) {
