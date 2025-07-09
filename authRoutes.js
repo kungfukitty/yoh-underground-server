@@ -11,7 +11,6 @@ const generateToken = (userId) => {
     const secret = process.env.JWT_SECRET;
     if (!secret) {
         console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
-        // In a real application, you might want to throw an error or handle this differently
         return null;
     }
     return jwt.sign({ id: userId }, secret, { expiresIn: '24h' });
