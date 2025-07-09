@@ -6,46 +6,38 @@ import authRoutes from './authRoutes.js';
 
 dotenv.config();
 
-// --- Final Fix: Reconstruct the service account from individual environment variables ---
-const serviceAccount = {
-  type: process.env.FIREBASE_TYPE,
-  project_id: process.env.FIREBASE_PROJECT_ID,
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  // This code will handle the formatting of the multi-line private key correctly.
-  private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: process.env.FIREBASE_AUTH_URI,
-  token_uri: process.env.FIREBASE_TOKEN_URI,
-  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
-  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
-};
+// --- Final Fix: Read the entire service account JSON from a single environment variable ---
+const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
-// Check if the essential variables are present
-if (!serviceAccount.project_id || !serviceAccount.private_key || !serviceAccount.client_email) {
-    console.error('FATAL ERROR: Missing required Firebase environment variables.');
-    process.exit(1);
+if (!serviceAccountString) {
+    console.error('FATAL ERROR: The FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set.');
+    // In a serverless environment, we need to handle this gracefully.
+    // This will ensure Vercel doesn't crash the entire function immediately.
+}
+
+let serviceAccount;
+try {
+    serviceAccount = JSON.parse(serviceAccountString);
+} catch (error) {
+    console.error('FATAL ERROR: Could not parse FIREBASE_SERVICE_ACCOUNT_JSON. Make sure it is a valid JSON string.', error);
+}
+
+
+// Initialize Firebase Admin SDK only if it hasn't been initialized already.
+// This is a best practice for serverless environments.
+if (!admin.apps.length) {
+    try {
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount)
+        });
+        console.log("Firebase Admin SDK initialized successfully.");
+    } catch (error) {
+        console.error("Error initializing Firebase Admin SDK:", error);
+    }
 }
 
 const app = express();
-const PORT = process.env.PORT || 10000;
-
-// Initialize Firebase Admin SDK
-try {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-    console.log("Firebase Admin SDK initialized successfully.");
-} catch (error) {
-    console.error("Error initializing Firebase Admin SDK:", error);
-    process.exit(1);
-}
-
-// --- CORS Configuration FIX ---
-// This is a more permissive setting to ensure the connection works.
-// It allows requests from any origin.
-app.use(cors()); 
+app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
@@ -54,6 +46,5 @@ app.get('/', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+// Export the app for Vercel to use
+export default app;
