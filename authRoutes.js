@@ -127,5 +127,3 @@ router.post('/login', async (req, res) => {
         res.status(500).json({ message: 'Server error during login.' });
     }
 });
-
-export default router;
