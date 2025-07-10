@@ -18,53 +18,41 @@ router.post('/claim-code', async (req, res) => {
     const db = admin.firestore();
     const { accessCode, password } = req.body;
 
-    // --- DIAGNOSTIC LOGGING ---
-    console.log(`[DIAGNOSTIC] Received request to claim code.`);
-    console.log(`[DIAGNOSTIC] Access Code from Frontend: '${accessCode}'`);
-    // ---
-
     if (!accessCode || !password) {
         return res.status(400).json({ message: 'Access code and password are required.' });
     }
 
     try {
         const usersRef = db.collection('users');
-        
-        const plainCodeQuery = usersRef.where('accessCode', '==', accessCode).limit(1);
-        const quotedCodeQuery = usersRef.where('accessCode', '==', `"${accessCode}"`).limit(1);
-
-        const [plainSnapshot, quotedSnapshot] = await Promise.all([
-            plainCodeQuery.get(),
-            quotedCodeQuery.get()
-        ]);
-
-        // --- DIAGNOSTIC LOGGING ---
-        console.log(`[DIAGNOSTIC] Plain query for '${accessCode}' found ${plainSnapshot.size} documents.`);
-        console.log(`[DIAGNOSTIC] Quoted query for '"${accessCode}"' found ${quotedSnapshot.size} documents.`);
-        // ---
-
-        const snapshot = !plainSnapshot.empty ? plainSnapshot : quotedSnapshot;
+        const snapshot = await usersRef.get();
 
         if (snapshot.empty) {
-            console.log('[DIAGNOSTIC] Both queries returned empty. Sending 404 error.');
+            return res.status(404).json({ message: 'No users found in the database.' });
+        }
+
+        let foundUser = null;
+        let foundDocId = null;
+
+        snapshot.forEach(doc => {
+            const userData = doc.data();
+            if (userData.accessCode === accessCode || userData.accessCode === `"${accessCode}"`) {
+                foundUser = userData;
+                foundDocId = doc.id;
+            }
+        });
+
+        if (!foundUser) {
             return res.status(404).json({ message: 'Invalid or expired access code.' });
         }
 
-        let userId, userData;
-        snapshot.forEach(doc => {
-            userId = doc.id;
-            userData = doc.data();
-            console.log(`[DIAGNOSTIC] Found user: ${userId} with data:`, JSON.stringify(userData));
-        });
-
-        if (userData.isClaimed) {
+        if (foundUser.isClaimed) {
             return res.status(400).json({ message: 'Access code has already been used.' });
         }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const userDocRef = usersRef.doc(userId);
+        const userDocRef = usersRef.doc(foundDocId);
         await userDocRef.update({
             password: hashedPassword,
             isClaimed: true,
@@ -72,7 +60,7 @@ router.post('/claim-code', async (req, res) => {
             activatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        const token = generateToken(userId);
+        const token = generateToken(foundDocId);
         if (!token) {
             return res.status(500).json({ message: 'Server configuration error: Could not generate token.' });
         }
@@ -120,10 +108,18 @@ router.post('/login', async (req, res) => {
         if (!token) {
             return res.status(500).json({ message: 'Server configuration error: Could not generate token.' });
         }
+        
+        // --- FINAL FIX: Include the 'isAdmin' status in the response ---
         res.status(200).json({
             message: 'Login successful.',
             token,
-            user: { id: userId, name: userData.name, email: userData.email }
+            user: { 
+                id: userId, 
+                name: userData.name, 
+                email: userData.email,
+                // Ensure the isAdmin flag is sent to the frontend
+                isAdmin: userData.isAdmin || false 
+            }
         });
 
     } catch (error) {
