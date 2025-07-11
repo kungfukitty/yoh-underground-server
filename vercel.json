@@ -8,8 +8,8 @@
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "src/server.js"
+      "src": "/(.*)",  // Catch all requests from the root
+      "dest": "src/server.js" // Direct them to server.js
     }
   ]
 }
