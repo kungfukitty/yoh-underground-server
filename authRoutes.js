@@ -18,18 +18,14 @@ router.post('/claim-code', async (req, res) => {
     const db = admin.firestore();
     const { accessCode, password } = req.body;
 
-    // --- DIAGNOSTIC LOGGING ---
-    console.log(`[DIAGNOSTIC] Received request to claim code at ${new Date().toISOString()}`);
-    console.log(`[DIAGNOSTIC] Access Code from Frontend: >>${accessCode}<< (Length: ${accessCode?.length})`);
-    // ---
-
     if (!accessCode || !password) {
         return res.status(400).json({ message: 'Access code and password are required.' });
     }
 
     try {
         const usersRef = db.collection('users');
-        const snapshot = await usersRef.get(); // Get ALL users
+        // --- NEW METHOD: Get ALL users to bypass any query/indexing issues ---
+        const snapshot = await usersRef.get();
 
         if (snapshot.empty) {
             return res.status(404).json({ message: 'No users found in the database.' });
@@ -38,24 +34,17 @@ router.post('/claim-code', async (req, res) => {
         let foundUser = null;
         let foundDocId = null;
 
-        // --- DIAGNOSTIC LOGGING ---
-        console.log(`[DIAGNOSTIC] Searching through ${snapshot.size} user documents...`);
+        // --- NEW METHOD: Manually search through the users in the code ---
         snapshot.forEach(doc => {
             const userData = doc.data();
-            const dbAccessCode = userData.accessCode;
-            
-            // Log the comparison values with detailed information
-            console.log(`[DIAGNOSTIC] Checking Doc ID ${doc.id}: DB Code: >>${dbAccessCode}<< (Length: ${dbAccessCode?.length})`);
-
-            if (dbAccessCode === accessCode) {
-                console.log(`[DIAGNOSTIC] MATCH FOUND for Doc ID ${doc.id}`);
+            // Check for a match with or without the quotes, just in case
+            if (userData.accessCode === accessCode || userData.accessCode === `"${accessCode}"`) {
                 foundUser = userData;
                 foundDocId = doc.id;
             }
         });
 
         if (!foundUser) {
-            console.log('[DIAGNOSTIC] No match found after checking all users.');
             return res.status(404).json({ message: 'Invalid or expired access code.' });
         }
 
