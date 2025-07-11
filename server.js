@@ -6,35 +6,47 @@ import authRoutes from './authRoutes.js';
 
 dotenv.config();
 
-const app = express();
+// --- Final Fix: Reconstruct the service account from individual environment variables ---
+const serviceAccount = {
+  type: process.env.FIREBASE_TYPE,
+  project_id: process.env.FIREBASE_PROJECT_ID,
+  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
+  private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+  client_email: process.env.FIREBASE_CLIENT_EMAIL,
+  client_id: process.env.FIREBASE_CLIENT_ID,
+  auth_uri: process.env.FIREBASE_AUTH_URI,
+  token_uri: process.env.FIREBASE_TOKEN_URI,
+  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
+  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
+};
 
-// --- Secure Firebase Initialization for Vercel ---
-try {
-  if (!admin.apps.length) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
-    
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    console.log("Firebase Admin SDK initialized successfully.");
-  }
-} catch (error) {
-  console.error("Firebase initialization error:", error.message);
-  if (error.message.includes('FIREBASE_SERVICE_ACCOUNT')) {
-      console.error("HINT: Ensure the FIREBASE_SERVICE_ACCOUNT_JSON environment variable is set correctly in your Vercel project settings.");
-  }
+// Initialize Firebase Admin SDK only if it hasn't been initialized already
+if (!admin.apps.length) {
+    // Check for essential variables before initializing
+    if (serviceAccount.project_id && serviceAccount.private_key && serviceAccount.client_email) {
+        try {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+            console.log("Firebase Admin SDK initialized successfully.");
+        } catch (error) {
+            console.error("Error initializing Firebase Admin SDK:", error);
+        }
+    } else {
+        console.error('FATAL ERROR: Missing required Firebase environment variables.');
+    }
 }
 
-// --- Middleware ---
+const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- API Routes ---
-app.get('/api', (req, res) => {
+app.get('/', (req, res) => {
     res.status(200).json({ message: "YOH Underground Server is operational." });
 });
 
 app.use('/api/auth', authRoutes);
 
-// --- Vercel Export ---
+// Export the app for Vercel to use
 export default app;
