@@ -13,7 +13,7 @@ const app = express();
 try {
   // Check if the app is already initialized to prevent errors during hot-reloads
   if (!admin.apps.length) {
-    // UPDATE: Changed to match the variable name in your Vercel settings.
+    // UPDATE: Changed to match the exact variable name in your Vercel settings.
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
     
     admin.initializeApp({
