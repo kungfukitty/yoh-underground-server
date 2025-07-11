@@ -58,9 +58,9 @@ app.get('/', (req, res) => {
     });
 });
 
-// REMINDER: Uncomment your authRoutes when you want them active
-// import authRoutes from './routes/authRoutes.js';
-// app.use('/auth', authRoutes);
+REMINDER: Uncomment your authRoutes when you want them active
+ import authRoutes from './routes/authRoutes.js';
+ app.use('/auth', authRoutes);
 
 
 // For local development
