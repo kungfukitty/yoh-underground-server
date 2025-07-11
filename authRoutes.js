@@ -15,7 +15,7 @@ const generateToken = (userId) => {
 };
 
 router.post('/claim-code', async (req, res) => {
-    const db = admin.firestore();
+    const db = admin.firestore(); // Firestore instance within the handler
     const { accessCode, password } = req.body;
 
     if (!accessCode || !password) {
@@ -24,38 +24,27 @@ router.post('/claim-code', async (req, res) => {
 
     try {
         const usersRef = db.collection('users');
-        // --- NEW METHOD: Get ALL users to bypass any query/indexing issues ---
-        const snapshot = await usersRef.get();
+        // Reverting to efficient query. Ensure Firestore index for 'accessCode' is correctly set.
+        const snapshot = await usersRef.where('accessCode', '==', accessCode).limit(1).get();
 
         if (snapshot.empty) {
-            return res.status(404).json({ message: 'No users found in the database.' });
-        }
-
-        let foundUser = null;
-        let foundDocId = null;
-
-        // --- NEW METHOD: Manually search through the users in the code ---
-        snapshot.forEach(doc => {
-            const userData = doc.data();
-            // Check for a match with or without the quotes, just in case
-            if (userData.accessCode === accessCode || userData.accessCode === `"${accessCode}"`) {
-                foundUser = userData;
-                foundDocId = doc.id;
-            }
-        });
-
-        if (!foundUser) {
             return res.status(404).json({ message: 'Invalid or expired access code.' });
         }
 
-        if (foundUser.isClaimed) {
+        let userId, userData;
+        snapshot.forEach(doc => {
+            userId = doc.id;
+            userData = doc.data();
+        });
+
+        if (userData.isClaimed) {
             return res.status(400).json({ message: 'Access code has already been used.' });
         }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const userDocRef = usersRef.doc(foundDocId);
+        const userDocRef = usersRef.doc(userId);
         await userDocRef.update({
             password: hashedPassword,
             isClaimed: true,
@@ -63,11 +52,17 @@ router.post('/claim-code', async (req, res) => {
             activatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        const token = generateToken(foundDocId);
+        const token = generateToken(userId);
         if (!token) {
             return res.status(500).json({ message: 'Server configuration error: Could not generate token.' });
         }
-        res.status(200).json({ message: 'Account activated successfully.', token });
+        
+        // Include user data in the response, consistent with login route
+        res.status(200).json({
+            message: 'Account activated successfully.',
+            token,
+            user: { id: userId, name: userData.name, email: userData.email, isAdmin: userData.isAdmin || false }
+        });
 
     } catch (error) {
         console.error('Error claiming access code:', error);
@@ -76,7 +71,7 @@ router.post('/claim-code', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-    const db = admin.firestore();
+    const db = admin.firestore(); // Firestore instance within the handler
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -88,6 +83,7 @@ router.post('/login', async (req, res) => {
         const snapshot = await usersRef.where('email', '==', email).limit(1).get();
 
         if (snapshot.empty) {
+            // Use a generic error message for security to not reveal if an email is registered.
             return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
