@@ -1,3 +1,4 @@
+console.log("SERVER START: Entering server.js execution.");
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv'; // Keep dotenv even though Vercel handles envs
