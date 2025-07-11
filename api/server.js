@@ -13,8 +13,8 @@ const app = express();
 try {
   // Check if the app is already initialized to prevent errors during hot-reloads
   if (!admin.apps.length) {
-    // Parse the service account JSON from the environment variable
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    // UPDATE: Changed to match the variable name in your Vercel settings.
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
     
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount)
@@ -24,8 +24,8 @@ try {
 } catch (error) {
   console.error("Firebase initialization error:", error.message);
   // You can add more detailed logging here if needed
-  if (error.message.includes('FIREBASE_SERVICE_ACCOUNT')) {
-      console.error("HINT: Ensure the FIREBASE_SERVICE_ACCOUNT environment variable is set correctly in your Vercel project settings.");
+  if (error.message.includes('FIREBASE_SERVICE_ACCOUNT_JSON')) {
+      console.error("HINT: Ensure the FIREBASE_SERVICE_ACCOUNT_JSON environment variable is set correctly in your Vercel project settings.");
   }
 }
 
