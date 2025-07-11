@@ -1,5 +1,4 @@
-console.log("SERVER START: Entering server.js execution.");
-import express from 'express';
+console.log("SERVER START: Entering server.js execution.");import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv'; // Keep dotenv even though Vercel handles envs
 import admin from 'firebase-admin'; // Keep for structure, but won't be used
