@@ -8,8 +8,8 @@
   ],
   "routes": [
     {
-      "src": "/(.*)",  // This regex now matches ALL incoming paths
-      "dest": "src/server.js" // And directs them to your server.js
+      "src": "/(.*)",
+      "dest": "src/server.js"
     }
   ]
 }
