@@ -1,30 +1,38 @@
-console.log("SERVER START: Entering server.js execution.");import express from 'express';
+console.log("SERVER START: Entering server.js execution.");
+import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv'; // Keep dotenv even though Vercel handles envs
-import admin from 'firebase-admin'; // Keep for structure, but won't be used
+import dotenv from 'dotenv';
+import admin from 'firebase-admin';
 
-dotenv.config(); // Still good practice locally, Vercel provides envs directly
+dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// --- TEMPORARY DEBUGGING START ---
+// --- Firebase Admin SDK Initialization (simplified) ---
 console.log("DEBUG: Server starting...");
 
-const encodedServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-const jwtSecret = process.env.JWT_SECRET;
+const serviceAccountJsonString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON; // Expecting raw JSON string
+const jwtSecret = process.env.JWT_SECRET; // Still need JWT_SECRET if used elsewhere
 
-if (!encodedServiceAccount) {
-    console.error("FATAL: FIREBASE_SERVICE_ACCOUNT is NOT set!");
+if (!serviceAccountJsonString) {
+    console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON is NOT set!");
     process.exit(1); // Exit early if critical env is missing
 } else {
-    console.log("DEBUG: FIREBASE_SERVICE_ACCOUNT is set (length:", encodedServiceAccount.length, ")");
+    console.log("DEBUG: FIREBASE_SERVICE_ACCOUNT_JSON is set (length:", serviceAccountJsonString.length, ")");
     try {
-        // Attempt to decode and parse to confirm it's valid, but don't init Firebase yet
-        const decodedAccount = Buffer.from(encodedServiceAccount, 'base64').toString('utf8');
-        const parsedAccount = JSON.parse(decodedAccount);
-        console.log("DEBUG: Service Account JSON parsed successfully. Project ID:", parsedAccount.project_id);
+        const serviceAccount = JSON.parse(serviceAccountJsonString); // Parse the raw JSON string
+        console.log("DEBUG: Service Account JSON parsed successfully. Project ID:", serviceAccount.project_id);
+
+        // Initialize Firebase Admin SDK
+        if (!admin.apps.length) {
+            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+            console.log("Firebase Admin SDK initialized successfully.");
+        } else {
+            console.log("Firebase Admin SDK already initialized.");
+        }
+
     } catch (parseError) {
-        console.error("FATAL: Error parsing FIREBASE_SERVICE_ACCOUNT JSON!", parseError.message);
+        console.error("FATAL: Error parsing FIREBASE_SERVICE_ACCOUNT_JSON! Make sure it is a valid JSON string.", parseError.message);
         process.exit(1); // Exit if parsing fails
     }
 }
@@ -35,39 +43,29 @@ if (!jwtSecret) {
 } else {
     console.log("DEBUG: JWT_SECRET is set (length:", jwtSecret.length, ")");
 }
-
-// Temporarily skip Firebase Admin SDK initialization to isolate env variable issue
-// try {
-//   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-//   console.log("Firebase Admin SDK initialized successfully.");
-// } catch (error) {
-//   console.error("Error initializing Firebase Admin SDK:", error.message);
-//   console.log("Please ensure you have a valid FIREBASE_SERVICE_ACCOUNT (Base64 encoded) environment variable.");
-//   process.exit(1);
-// }
-// --- TEMPORARY DEBUGGING END ---
+// --- END Firebase Admin SDK Initialization ---
 
 
 app.use(cors());
 app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.status(200).json({
-    message: "YOH Underground Server is operational (DEBUGGING MODE).",
-    status: "OK",
-    timestamp: new Date().toISOString(),
-    envCheck: "See logs for details." // Indicate env check in logs
-  });
+    res.status(200).json({
+        message: "YOH Underground Server is operational.",
+        status: "OK",
+        timestamp: new Date().toISOString(),
+        envCheck: "See logs for Firebase initialization status."
+    });
 });
 
-// Temporarily remove authRoutes to simplify startup
+// REMINDER: Uncomment your authRoutes when you want them active
 // import authRoutes from './routes/authRoutes.js';
 // app.use('/auth', authRoutes);
 
 
 // For local development
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
 
 // For Vercel deployment, export the app instance
