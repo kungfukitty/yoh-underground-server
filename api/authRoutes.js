@@ -5,10 +5,13 @@ import jwt from 'jsonwebtoken';
 
 const router = Router();
 
+// Helper function to generate a JWT
 const generateToken = (userId) => {
+    // Ensure you have JWT_SECRET set in your environment variables on Vercel
     return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 
+// Route to claim an access code and set a password
 router.post('/claim-code', async (req, res) => {
     const db = admin.firestore();
     const { accessCode, password } = req.body;
@@ -22,7 +25,6 @@ router.post('/claim-code', async (req, res) => {
         const snapshot = await usersRef.where('accessCode', '==', accessCode).limit(1).get();
 
         if (snapshot.empty) {
-            console.log(`[DEBUG] Query for accessCode "${accessCode}" found no documents.`);
             return res.status(404).json({ message: 'Invalid or expired access code.' });
         }
 
@@ -43,12 +45,11 @@ router.post('/claim-code', async (req, res) => {
         await userDocRef.update({
             password: hashedPassword,
             isClaimed: true,
-            accessCode: admin.firestore.FieldValue.delete(),
+            accessCode: admin.firestore.FieldValue.delete(), // Remove the access code after use
             activatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        const token = generateToken(userId);
-        res.status(200).json({ message: 'Account activated successfully.', token });
+        res.status(200).json({ message: 'Account activated successfully.' });
 
     } catch (error) {
         console.error('Error claiming access code:', error);
@@ -56,6 +57,7 @@ router.post('/claim-code', async (req, res) => {
     }
 });
 
+// Route for user login
 router.post('/login', async (req, res) => {
     const db = admin.firestore();
     const { email, password } = req.body;
@@ -89,10 +91,13 @@ router.post('/login', async (req, res) => {
         }
 
         const token = generateToken(userId);
+        // Do not send the password hash back to the client
+        const { password: _, ...userPayload } = userData;
+
         res.status(200).json({
             message: 'Login successful.',
             token,
-            user: { id: userId, name: userData.name, email: userData.email }
+            user: { id: userId, ...userPayload }
         });
 
     } catch (error) {
