@@ -2,51 +2,54 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import admin from 'firebase-admin';
-import authRoutes from './authRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 dotenv.config();
+const app = express();
+const PORT = process.env.PORT || 5000;
 
-// --- Final Fix: Reconstruct the service account from individual environment variables ---
-const serviceAccount = {
-  type: process.env.FIREBASE_TYPE,
-  project_id: process.env.FIREBASE_PROJECT_ID,
-  private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-  private_key: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-  client_email: process.env.FIREBASE_CLIENT_EMAIL,
-  client_id: process.env.FIREBASE_CLIENT_ID,
-  auth_uri: process.env.FIREBASE_AUTH_URI,
-  token_uri: process.env.FIREBASE_TOKEN_URI,
-  auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
-  client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
-  universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
-};
+try {
+  const encodedServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
 
-// Initialize Firebase Admin SDK only if it hasn't been initialized already
-if (!admin.apps.length) {
-    // Check for essential variables before initializing
-    if (serviceAccount.project_id && serviceAccount.private_key && serviceAccount.client_email) {
-        try {
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount)
-            });
-            console.log("Firebase Admin SDK initialized successfully.");
-        } catch (error) {
-            console.error("Error initializing Firebase Admin SDK:", error);
-        }
-    } else {
-        console.error('FATAL ERROR: Missing required Firebase environment variables.');
-    }
+  if (!encodedServiceAccount) {
+    throw new Error("FIREBASE_SERVICE_ACCOUNT environment variable is not set or is empty.");
+  }
+
+  const serviceAccount = JSON.parse(Buffer.from(encodedServiceAccount, 'base64').toString('utf8'));
+
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  console.log("Firebase Admin SDK initialized successfully.");
+} catch (error) {
+  console.error("Error initializing Firebase Admin SDK:", error.message);
+  console.log("Please ensure you have a valid FIREBASE_SERVICE_ACCOUNT (Base64 encoded) environment variable in Render.");
 }
 
-const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Main welcome route
 app.get('/', (req, res) => {
-    res.status(200).json({ message: "YOH Underground Server is operational." });
+  res.status(200).json({
+    message: "YOH Underground Server is operational.",
+    status: "OK",
+    timestamp: new Date().toISOString()
+  });
 });
 
-app.use('/api/auth', authRoutes);
+// --- MODIFIED LINE HERE ---
+// Mount authentication routes under the '/auth' path
+app.use('/auth', authRoutes);
+// If you want auth routes directly at the root (e.g., /claim, /login), use:
+// app.use('/', authRoutes);
+// Choose one of the above based on your desired final URL structure.
+// For now, '/auth' is a good balance.
 
-// Export the app for Vercel to use
+// For local development
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+// For Vercel deployment, export the app instance
 export default app;
