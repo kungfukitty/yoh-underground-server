@@ -2,7 +2,7 @@ console.log("SERVER START: Entering server.js execution.");
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import admin from 'firebase-admin';
+import admin from 'firebase-admin'; // Ensure firebase-admin is installed: npm install firebase-admin
 
 dotenv.config();
 const app = express();
@@ -58,9 +58,9 @@ app.get('/', (req, res) => {
     });
 });
 
-REMINDER: Uncomment your authRoutes when you want them active
- import authRoutes from './routes/authRoutes.js';
- app.use('/auth', authRoutes);
+// Authentication Routes - NOW UNCOMMENTED AND PROPERLY FORMATTED
+import authRoutes from './routes/authRoutes.js'; // Ensure this path is correct: ./routes/authRoutes.js
+app.use('/auth', authRoutes);
 
 
 // For local development
