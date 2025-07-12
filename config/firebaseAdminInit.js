@@ -2,7 +2,8 @@
 import admin from 'firebase-admin';
 import { Storage } from '@google-cloud/storage'; 
 
-const serviceAccountJsonBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_; // Corrected ENV var name
+// Use the correct environment variable name as specified by the user
+const serviceAccountJsonString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON; 
 
 
 let initializedAuth;
@@ -12,20 +13,18 @@ let initializedStorage;
 
 // Ensure Firebase Admin SDK is initialized only once
 if (!admin.apps.length) {
-  if (!serviceAccountJsonBase64) {
-    console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON_ is NOT set! Cannot initialize Firebase Admin SDK.");
+  if (!serviceAccountJsonString) {
+    console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON is NOT set or is empty! Cannot initialize Firebase Admin SDK.");
     process.exit(1);
   }
 
   try {
-    // Decode the Base64 string back into a JSON string
-    const serviceAccountJson = Buffer.from(serviceAccountJsonBase64, 'base64').toString('utf8');
-    const serviceAccount = JSON.parse(serviceAccountJson); // Parse the JSON string into an object
+    // Parse the JSON string directly
+    const serviceAccount = JSON.parse(serviceAccountJsonString); 
 
     const app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       databaseURL: process.env.FIREBASE_DATABASE_URL, // Optional: if you use Realtime Database
-      // Note: storageBucket is no longer explicitly set here as it can be inferred or handled by the Storage client
     });
     console.log("Firebase Admin SDK initialized successfully.");
 
@@ -33,19 +32,18 @@ if (!admin.apps.length) {
     initializedDb = app.firestore();
     
     // Initialize Storage using the @google-cloud/storage client library
-    // The bucket name will be inferred from the project ID if it's the default bucket
     initializedStorage = new Storage({
       projectId: serviceAccount.project_id, // Get project ID directly from the parsed serviceAccount object
       credentials: {
         client_email: serviceAccount.client_email,
-        private_key: serviceAccount.private_key, 
+        private_key: serviceAccount.private_key, // private_key should be correctly formatted after JSON.parse
       }
-    }).bucket(`${serviceAccount.project_id}.appspot.com`); // Explicitly target the default bucket
+    }).bucket(`${serviceAccount.project_id}.appspot.com`); // Explicitly target the default bucket using project_id
     console.log("Firebase Storage initialized successfully.");
 
   } catch (error) {
     console.error("FATAL: Error initializing Firebase Admin SDK or Storage:", error.message);
-    console.error("Please ensure FIREBASE_SERVICE_ACCOUNT_JSON_ is a valid Base64 encoded JSON string.");
+    console.error("Please ensure FIREBASE_SERVICE_ACCOUNT_JSON is a valid JSON string.");
     process.exit(1);
   }
 } else {
@@ -56,18 +54,17 @@ if (!admin.apps.length) {
   initializedDb = app.firestore();
   
   // Re-initialize Storage for consistency if app was already initialized
-  const serviceAccountJson = Buffer.from(serviceAccountJsonBase64, 'base64').toString('utf8');
-  const serviceAccount = JSON.parse(serviceAccountJson);
+  const serviceAccount = JSON.parse(serviceAccountJsonString);
   initializedStorage = new Storage({
       projectId: serviceAccount.project_id,
       credentials: {
         client_email: serviceAccount.client_email,
         private_key: serviceAccount.private_key,
       }
-    }).bucket(`${serviceAccount.project_id}.appspot.com`); // Explicitly target the default bucket
+    }).bucket(`${serviceAccount.project_id}.appspot.com`);
 }
 
 // Export the initialized auth, db, and storage instances for use in other modules
 export const auth = initializedAuth;
 export const db = initializedDb;
-export const bucket = initializedStorage; // Ensure this export remains present and correct
+export const bucket = initializedStorage;
