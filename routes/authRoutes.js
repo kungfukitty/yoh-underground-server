@@ -1,16 +1,17 @@
 import express from 'express';
-import admin from 'firebase-admin'; // Already imported for login/signup
-import jwt from 'jsonwebtoken';     // Already imported for custom JWT
+// REMOVED: import admin from 'firebase-admin'; // Firebase Admin SDK is now imported from init file
+// NEW: Import auth and db from the centralized init file
+import { auth, db } from '../config/firebaseAdminInit.js'; // <-- Adjust path if 'config' is elsewhere relative to 'routes'
+import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
-// Get Firebase Auth and Firestore services from the initialized Admin SDK
-const auth = admin.auth();
-const db = admin.firestore(); // Assuming you have Firestore enabled and want to use it for access codes
+// 'auth' and 'db' are now guaranteed to be initialized instances
+// because firebaseAdminInit.js handles the initialization logic.
 
-// --- Login Route (existing) ---
+// --- Login Route ---
 router.post('/login', async (req, res) => {
-  const { idToken } = req.body; // Expecting Firebase ID Token from client
+  const { idToken } = req.body;
 
   if (!idToken) {
     return res.status(400).json({ message: 'Firebase ID Token is required.' });
@@ -54,7 +55,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// --- Signup Route (existing) ---
+// --- Signup Route ---
 router.post('/signup', async (req, res) => {
   const { email, password, displayName } = req.body;
 
@@ -93,7 +94,7 @@ router.post('/signup', async (req, res) => {
   }
 });
 
-// --- NEW: Claim Access Code Route ---
+// --- Claim Access Code Route ---
 router.post('/claim', async (req, res) => {
   const { accessCode, password } = req.body;
 
@@ -118,34 +119,24 @@ router.post('/claim', async (req, res) => {
         return res.status(404).json({ message: 'Invalid or expired access code.' });
     }
 
-    // Assuming the access code is tied to an email. Adjust if your logic is different.
-    const email = codeData.email; // The email associated with this access code
+    const email = codeData.email;
     if (!email) {
         console.error(`Access code ${accessCode} has no associated email.`);
         return res.status(500).json({ message: 'Access code is malformed or missing associated user data.' });
     }
 
-    // 2. Create User (or update if user exists and you want to link)
-    // For claiming, typically a new user is created.
+    // 2. Create User (or handle existing user)
     let userRecord;
     try {
       userRecord = await auth.createUser({
         email: email,
         password: password,
-        // You can add displayName, photoURL if available from codeData
         emailVerified: false,
         disabled: false,
       });
       console.log(`New user created via access code: ${userRecord.uid}`);
     } catch (createError) {
       if (createError.code === 'auth/email-already-exists') {
-        // If email already exists, you might want to link the access code
-        // to the existing user, or require a different flow.
-        // For simplicity, we'll return an error here, but you can customize.
-        // If you want to link:
-        // const existingUser = await auth.getUserByEmail(email);
-        // await auth.updateUser(existingUser.uid, { password: password }); // Update password for existing user
-        // userRecord = existingUser;
         return res.status(409).json({ message: 'Account already exists for this access code. Please log in.' });
       } else if (createError.code === 'auth/weak-password') {
         return res.status(400).json({ message: 'Password is too weak. Must be at least 6 characters.' });
@@ -165,19 +156,16 @@ router.post('/claim', async (req, res) => {
 
     console.log(`Access code ${accessCode} claimed successfully by ${userRecord.uid}.`);
 
-    // 4. (Optional) Create and return a custom JWT for immediate login
+    // 4. Create and return a custom JWT for immediate login
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
       console.error("JWT_SECRET is not set. Cannot issue custom JWT after claim.");
-      // Still send success, but without JWT
       return res.status(200).json({ message: 'Access code activated successfully. Please log in.', uid: userRecord.uid, email: userRecord.email });
     }
 
     const customPayload = {
       uid: userRecord.uid,
       email: userRecord.email,
-      // Add any custom claims/roles here
-      // role: 'activated_user',
     };
     const customJwt = jwt.sign(customPayload, jwtSecret, { expiresIn: '1h' });
 
@@ -185,7 +173,7 @@ router.post('/claim', async (req, res) => {
       message: 'Access code activated successfully!',
       uid: userRecord.uid,
       email: userRecord.email,
-      customToken: customJwt, // Send your custom JWT for client to use
+      customToken: customJwt,
     });
 
   } catch (error) {
@@ -194,5 +182,4 @@ router.post('/claim', async (req, res) => {
   }
 });
 
-// Export the router so it can be used in server.js
 export default router;
