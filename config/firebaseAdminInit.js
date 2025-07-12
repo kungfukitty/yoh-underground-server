@@ -2,7 +2,6 @@
 import admin from 'firebase-admin';
 import { Storage } from '@google-cloud/storage'; 
 
-// Use the correct environment variable name as specified by the user
 const serviceAccountJsonString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON; 
 
 
@@ -19,26 +18,23 @@ if (!admin.apps.length) {
   }
 
   try {
-    // Parse the JSON string directly
     const serviceAccount = JSON.parse(serviceAccountJsonString); 
 
     const app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      databaseURL: process.env.FIREBASE_DATABASE_URL, // Optional: if you use Realtime Database
+      databaseURL: process.env.FIREBASE_DATABASE_URL, 
     });
     console.log("Firebase Admin SDK initialized successfully.");
 
     initializedAuth = app.auth();
     initializedDb = app.firestore();
-    
-    // Initialize Storage using the @google-cloud/storage client library
     initializedStorage = new Storage({
-      projectId: serviceAccount.project_id, // Get project ID directly from the parsed serviceAccount object
+      projectId: serviceAccount.project_id, 
       credentials: {
         client_email: serviceAccount.client_email,
-        private_key: serviceAccount.private_key, // private_key should be correctly formatted after JSON.parse
+        private_key: serviceAccount.private_key, 
       }
-    }).bucket(`${serviceAccount.project_id}.appspot.com`); // Explicitly target the default bucket using project_id
+    }).bucket(`${serviceAccount.project_id}.appspot.com`); 
     console.log("Firebase Storage initialized successfully.");
 
   } catch (error) {
@@ -47,13 +43,10 @@ if (!admin.apps.length) {
     process.exit(1);
   }
 } else {
-  // If an app is already initialized, retrieve its services
   const app = admin.app();
   console.log("Firebase Admin SDK already initialized.");
   initializedAuth = app.auth();
   initializedDb = app.firestore();
-  
-  // Re-initialize Storage for consistency if app was already initialized
   const serviceAccount = JSON.parse(serviceAccountJsonString);
   initializedStorage = new Storage({
       projectId: serviceAccount.project_id,
@@ -64,7 +57,8 @@ if (!admin.apps.length) {
     }).bucket(`${serviceAccount.project_id}.appspot.com`);
 }
 
-// Export the initialized auth, db, and storage instances for use in other modules
+// Export the initialized auth, db, storage, AND admin instances for use in other modules
+export const adminApp = admin; // NEW: Export the admin object itself
 export const auth = initializedAuth;
 export const db = initializedDb;
 export const bucket = initializedStorage;
