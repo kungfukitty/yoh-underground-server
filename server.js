@@ -8,7 +8,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// --- Firebase Admin SDK Initialization (simplified) ---
+// --- Firebase Admin SDK Initialization ---
 console.log("DEBUG: Server starting...");
 
 const serviceAccountJsonString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON; // Expecting raw JSON string
@@ -58,9 +58,9 @@ app.get('/', (req, res) => {
     });
 });
 
-// Authentication Routes - NOW UNCOMMENTED AND PROPERLY FORMATTED
+// Authentication Routes - Adjusted to correctly match /api/auth path
 import authRoutes from './routes/authRoutes.js'; // Ensure this path is correct: ./routes/authRoutes.js
-app.use('/auth', authRoutes);
+app.use('/api/auth', authRoutes); // <-- THIS LINE IS FIXED to include '/api' prefix
 
 
 // For local development
