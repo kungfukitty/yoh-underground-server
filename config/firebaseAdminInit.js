@@ -2,7 +2,7 @@
 import admin from 'firebase-admin';
 import { Storage } from '@google-cloud/storage'; 
 
-const serviceAccountJsonBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64; 
+const serviceAccountJsonBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_; // *** CORRECTED ENVIRONMENT VARIABLE NAME ***
 const storageBucketName = process.env.FIREBASE_STORAGE_BUCKET; 
 
 
@@ -14,7 +14,7 @@ let initializedStorage;
 // Ensure Firebase Admin SDK is initialized only once
 if (!admin.apps.length) {
   if (!serviceAccountJsonBase64) {
-    console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 is NOT set! Cannot initialize Firebase Admin SDK.");
+    console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON_ is NOT set! Cannot initialize Firebase Admin SDK.");
     process.exit(1);
   }
   if (!storageBucketName) {
@@ -48,7 +48,7 @@ if (!admin.apps.length) {
 
   } catch (error) {
     console.error("FATAL: Error initializing Firebase Admin SDK or Storage:", error.message);
-    console.error("Please ensure FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 is a valid Base64 encoded JSON string and FIREBASE_STORAGE_BUCKET is set.");
+    console.error("Please ensure FIREBASE_SERVICE_ACCOUNT_JSON_ is a valid Base64 encoded JSON string and FIREBASE_STORAGE_BUCKET is set.");
     process.exit(1);
   }
 } else {
@@ -72,4 +72,4 @@ if (!admin.apps.length) {
 // Export the initialized auth, db, and storage instances for use in other modules
 export const auth = initializedAuth;
 export const db = initializedDb;
-export const bucket = initializedStorage; // <--- ENSURE THIS LINE IS PRESENT AND UNCOMMENTED!
+export const bucket = initializedStorage; // Ensure this export remains present
