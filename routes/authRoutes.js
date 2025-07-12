@@ -1,21 +1,22 @@
+// File: routes/authRoutes.js
 import { Router } from 'express';
-import admin from 'firebase-admin';
+// Import adminApp and db from the initialized Firebase Admin SDK
+import { adminApp, db } from '../config/firebaseAdminInit.js'; // <-- UPDATED IMPORT
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
 
-// Helper function to generate a JWT
+// Helper function to generate a JWT (no changes needed here)
 const generateToken = (userId) => {
     console.log("[DEBUG] Generating JWT for user:", userId);
-    // Ensure you have JWT_SECRET set in your environment variables on Vercel
     return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 
 // Route to claim an access code and set a password
 router.post('/claim-code', async (req, res) => {
     console.log("[DEBUG] API call received at /claim-code endpoint.");
-    const db = admin.firestore();
+    // const db = admin.firestore(); // THIS LINE IS NOW REDUNDANT AND WRONG - `db` is imported above
     const { accessCode, password } = req.body;
 
     if (!accessCode || !password) {
@@ -23,7 +24,7 @@ router.post('/claim-code', async (req, res) => {
     }
 
     try {
-        const usersRef = db.collection('users');
+        const usersRef = db.collection('users'); // `db` is now correctly imported
         const snapshot = await usersRef.where('accessCode', '==', accessCode).limit(1).get();
 
         if (snapshot.empty) {
@@ -48,8 +49,8 @@ router.post('/claim-code', async (req, res) => {
         await userDocRef.update({
             password: hashedPassword,
             isClaimed: true,
-            accessCode: admin.firestore.FieldValue.delete(), // Remove the access code after use
-            activatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            accessCode: adminApp.firestore.FieldValue.delete(), // <-- UPDATED: Use adminApp for FieldValue
+            activatedAt: adminApp.firestore.FieldValue.serverTimestamp(), // <-- UPDATED: Use adminApp for FieldValue
         });
 
         res.status(200).json({ message: 'Account activated successfully.' });
@@ -60,10 +61,10 @@ router.post('/claim-code', async (req, res) => {
     }
 });
 
-// Route for user login
+// Route for user login (no changes needed here, as `db` was already correctly used)
 router.post('/login', async (req, res) => {
     console.log("[DEBUG] API call received at /login endpoint.");
-    const db = admin.firestore();
+    // const db = admin.firestore(); // THIS LINE IS NOW REDUNDANT AND WRONG - `db` is imported above
     const { email, password } = req.body;
 
     if (!email || !password) {
