@@ -9,7 +9,9 @@ let initializedDb;
 if (!admin.apps.length) {
   if (!serviceAccountJsonString) {
     console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON is NOT set! Cannot initialize Firebase Admin SDK.");
-    process.exit(1); // Exit if critical env is missing
+    // Exit the process if critical environment variable is missing
+    // Vercel will report this as a build/runtime error.
+    process.exit(1);
   }
 
   try {
@@ -17,6 +19,8 @@ if (!admin.apps.length) {
     const app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
       // Add other configurations if needed, e.g., databaseURL, storageBucket
+      // databaseURL: "https://your-project-id.firebaseio.com",
+      // storageBucket: "your-project-id.appspot.com"
     });
     console.log("Firebase Admin SDK initialized successfully.");
 
@@ -25,7 +29,8 @@ if (!admin.apps.length) {
   } catch (error) {
     console.error("FATAL: Error initializing Firebase Admin SDK:", error.message);
     console.error("Please ensure FIREBASE_SERVICE_ACCOUNT_JSON is a valid JSON string.");
-    process.exit(1); // Exit if initialization fails
+    // Exit the process if initialization fails due to bad JSON
+    process.exit(1);
   }
 } else {
   // If an app is already initialized (e.g., on a warm start), retrieve its services
