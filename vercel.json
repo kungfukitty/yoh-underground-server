@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "installCommand": "npm install",
   "builds": [
     {
       "src": "server.js",
@@ -10,8 +9,7 @@
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "server.js",
-      "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"]
+      "dest": "server.js"
     }
   ]
 }
