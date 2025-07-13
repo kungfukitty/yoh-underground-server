@@ -1,13 +1,11 @@
-// File: routes/memberRoutes.js - UPDATED (Import adminApp)
+// File: routes/memberRoutes.js - UPDATED (Convert ndaAcceptedAt to ISO string)
 
 import { Router } from 'express';
-// Import db AND adminApp from the initialized Firebase Admin SDK
-import { db, adminApp } from '../config/firebaseAdminInit.js'; // <-- UPDATED IMPORT: Added adminApp
+import { db, adminApp } from '../config/firebaseAdminInit.js';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
 
-// Middleware to protect routes (already existing)
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1]; 
@@ -26,7 +24,7 @@ const authenticateToken = (req, res, next) => {
     });
 };
 
-// --- NDA Management Route ---
+// --- NDA Management Route (existing) ---
 router.post('/acknowledge-nda', authenticateToken, async (req, res) => {
     console.log("[DEBUG] API call received at /acknowledge-nda endpoint by user:", req.user.id);
     
@@ -48,10 +46,9 @@ router.post('/acknowledge-nda', authenticateToken, async (req, res) => {
             return res.status(200).json({ message: 'NDA already acknowledged.', isNDAAccepted: true });
         }
 
-        // Update user document to mark NDA as accepted
         await userDocRef.update({
             isNDAAccepted: true,
-            ndaAcceptedAt: adminApp.firestore.FieldValue.serverTimestamp(), // Correctly using adminApp
+            ndaAcceptedAt: adminApp.firestore.FieldValue.serverTimestamp(),
         });
 
         console.log(`[DEBUG] User ${userId} successfully acknowledged NDA.`);
@@ -63,7 +60,7 @@ router.post('/acknowledge-nda', authenticateToken, async (req, res) => {
     }
 });
 
-// Route to get NDA status (already existing)
+// Route to get NDA status (existing)
 router.get('/nda-status', authenticateToken, async (req, res) => {
     console.log("[DEBUG] API call received at /nda-status endpoint by user:", req.user.id);
     
@@ -77,6 +74,7 @@ router.get('/nda-status', authenticateToken, async (req, res) => {
         }
 
         const isNDAAccepted = userDoc.data().isNDAAccepted || false;
+        // Correctly convert Firestore Timestamp to ISO string here
         const ndaAcceptedAt = userDoc.data().ndaAcceptedAt ? userDoc.data().ndaAcceptedAt.toDate().toISOString() : null;
 
         res.status(200).json({
@@ -91,7 +89,7 @@ router.get('/nda-status', authenticateToken, async (req, res) => {
     }
 });
 
-// --- Personalized Member Profiles Routes (existing) ---
+// --- Personalized Member Profiles Routes (UPDATED for GET /profile) ---
 // Get User Profile
 router.get('/profile', authenticateToken, async (req, res) => {
     console.log("[DEBUG] API call received at /profile GET endpoint for user:", req.user.id);
@@ -107,7 +105,15 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
         const userData = userDoc.data();
 
+        // Filter out sensitive data like password hash and access code
         const { password, accessCode, ...profileData } = userData; 
+
+        // Convert ndaAcceptedAt Firestore Timestamp to ISO string before sending to frontend
+        if (profileData.ndaAcceptedAt && typeof profileData.ndaAcceptedAt.toDate === 'function') {
+            profileData.ndaAcceptedAt = profileData.ndaAcceptedAt.toDate().toISOString();
+        } else {
+            profileData.ndaAcceptedAt = null; // Ensure it's null if not a valid timestamp
+        }
 
         res.status(200).json({
             message: 'User profile retrieved successfully.',
@@ -120,7 +126,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-// Update User Profile
+// Update User Profile (existing)
 router.put('/profile', authenticateToken, async (req, res) => {
     console.log("[DEBUG] API call received at /profile PUT endpoint for user:", req.user.id);
     const userId = req.user.id;
