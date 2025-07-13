@@ -1,16 +1,14 @@
-// File: routes/eventRoutes.js
+// File: routes/eventRoutes.js - UPDATED (Convert event.date to ISO string)
 
 import { Router } from 'express';
-import { db, adminApp } from '../config/firebaseAdminInit.js'; // Import db and adminApp
+import { db, adminApp } from '../config/firebaseAdminInit.js';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
 
-// Middleware to protect routes (re-using from memberRoutes or authRoutes)
-// This ensures only authenticated users can access event-related actions
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1]; 
 
     if (token == null) {
         return res.status(401).json({ message: 'Authentication token required.' });
@@ -21,12 +19,11 @@ const authenticateToken = (req, res, next) => {
             console.error("[DEBUG] JWT verification failed:", err.message);
             return res.status(403).json({ message: 'Invalid or expired token.' });
         }
-        req.user = user; // Attach user payload from token
+        req.user = user; 
         next();
     });
 };
 
-// Middleware to check NDA acceptance (optional, but good for exclusive access)
 const checkNdaAccepted = async (req, res, next) => {
     try {
         const userDoc = await db.collection('users').doc(req.user.id).get();
@@ -42,12 +39,11 @@ const checkNdaAccepted = async (req, res, next) => {
 
 // --- Event Routes ---
 
-// GET /api/events - Get a list of upcoming events
+// GET /api/events - Get a list of upcoming events - UPDATED
 router.get('/', authenticateToken, checkNdaAccepted, async (req, res) => {
     console.log("[DEBUG] API call received at /events GET endpoint.");
     try {
         const eventsRef = db.collection('events');
-        // Fetch events that are upcoming (date is in the future)
         const snapshot = await eventsRef
             .where('date', '>=', adminApp.firestore.Timestamp.now())
             .orderBy('date', 'asc')
@@ -59,8 +55,9 @@ router.get('/', authenticateToken, checkNdaAccepted, async (req, res) => {
             events.push({
                 id: doc.id,
                 ...eventData,
-                date: eventData.date ? eventData.date.toDate().toISOString() : null, // Convert Timestamp to ISO string
-                // Optionally, hide internal fields like maxCapacity or attendees if not needed on frontend directly
+                // --- FIX START: Convert date Timestamp to ISO string here ---
+                date: eventData.date && typeof eventData.date.toDate === 'function' ? eventData.date.toDate().toISOString() : eventData.date,
+                // --- FIX END ---
             });
         });
 
@@ -75,7 +72,7 @@ router.get('/', authenticateToken, checkNdaAccepted, async (req, res) => {
     }
 });
 
-// POST /api/events/:eventId/rsvp - RSVP to an event
+// POST /api/events/:eventId/rsvp (existing)
 router.post('/:eventId/rsvp', authenticateToken, checkNdaAccepted, async (req, res) => {
     const eventId = req.params.eventId;
     const userId = req.user.id;
@@ -101,7 +98,6 @@ router.post('/:eventId/rsvp', authenticateToken, checkNdaAccepted, async (req, r
             return res.status(400).json({ message: 'Event is full.' });
         }
 
-        // Atomically add userId to attendees array
         await eventRef.update({
             attendees: adminApp.firestore.FieldValue.arrayUnion(userId)
         });
@@ -114,7 +110,7 @@ router.post('/:eventId/rsvp', authenticateToken, checkNdaAccepted, async (req, r
     }
 });
 
-// DELETE /api/events/:eventId/rsvp - Cancel RSVP for an event
+// DELETE /api/events/:eventId/rsvp (existing)
 router.delete('/:eventId/rsvp', authenticateToken, checkNdaAccepted, async (req, res) => {
     const eventId = req.params.eventId;
     const userId = req.user.id;
@@ -135,7 +131,6 @@ router.delete('/:eventId/rsvp', authenticateToken, checkNdaAccepted, async (req,
             return res.status(400).json({ message: 'Not RSVPd for this event.' });
         }
 
-        // Atomically remove userId from attendees array
         await eventRef.update({
             attendees: adminApp.firestore.FieldValue.arrayRemove(userId)
         });
