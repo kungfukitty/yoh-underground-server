@@ -1,4 +1,5 @@
-// File: config/firebaseAdminInit.js
+// File: config/firebaseAdminInit.js - COMPLETE AND UP-TO-DATE
+
 import admin from 'firebase-admin';
 import { Storage } from '@google-cloud/storage'; 
 
@@ -58,7 +59,7 @@ if (!admin.apps.length) {
 }
 
 // Export the initialized auth, db, storage, AND admin instances for use in other modules
-export const adminApp = admin; // NEW: Export the admin object itself
+export const adminApp = admin; 
 export const auth = initializedAuth;
 export const db = initializedDb;
 export const bucket = initializedStorage;
