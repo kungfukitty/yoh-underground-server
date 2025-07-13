@@ -4,7 +4,7 @@ console.log("SERVER START: Entering server.js execution.");
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-// NEW: Import all necessary components from firebaseAdminInit.js, including bucket and adminApp
+// Import all necessary components from firebaseAdminInit.js
 import { auth, db, bucket, adminApp } from './config/firebaseAdminInit.js'; 
 
 
@@ -42,13 +42,13 @@ app.get('/', (req, res) => {
 import authRoutes from './routes/authRoutes.js';
 app.use('/api/auth', authRoutes);
 
-// Member-specific Routes (NDA Management, Profile)
-import memberRoutes from './routes/memberRoutes.js'; // NEW: Import member routes
-app.use('/api/member', memberRoutes); // NEW: Mount member routes
+// Member-specific Routes (NDA Management, Profile, Connection Preferences)
+import memberRoutes from './routes/memberRoutes.js';
+app.use('/api/member', memberRoutes);
 
 // Event Routes (Curated Event Calendar)
-import eventRoutes from './routes/eventRoutes.js'; // NEW: Import event routes
-app.use('/api/events', eventRoutes); // NEW: Mount event routes
+import eventRoutes from './routes/eventRoutes.js';
+app.use('/api/events', eventRoutes);
 
 
 // For local development
