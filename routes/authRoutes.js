@@ -1,4 +1,4 @@
-// File: routes/authRoutes.js - UPDATED for claim-code response
+// File: routes/authRoutes.js - UPDATED (Set default name and status on claim-code)
 
 import { Router } from 'express';
 import { adminApp, db } from '../config/firebaseAdminInit.js';
@@ -12,6 +12,7 @@ const generateToken = (userId) => {
     return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
 };
 
+// Route to claim an access code and set a password - UPDATED
 router.post('/claim-code', async (req, res) => {
     console.log("[DEBUG] API call received at /claim-code endpoint.");
     const { accessCode, password } = req.body;
@@ -48,22 +49,22 @@ router.post('/claim-code', async (req, res) => {
             isClaimed: true,
             accessCode: adminApp.firestore.FieldValue.delete(),
             activatedAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            isNDAAccepted: false // <-- ADD THIS LINE: Initialize NDA status for new accounts
+            isNDAAccepted: false,
+            name: userData.name || userData.email.split('@')[0] || 'New Member', // NEW: Set default name
+            status: userData.status || 'Active', // NEW: Set default status
         });
 
-        // Fetch the updated user data to send in the response, including isNDAAccepted
         const updatedUserDoc = await userDocRef.get();
         const updatedUserData = updatedUserDoc.data();
         const token = generateToken(userId);
 
-        // Construct user payload for the frontend
         const { password: _, accessCode: __, ...userPayload } = updatedUserData;
 
 
         res.status(200).json({
             message: 'Account activated successfully.',
             token,
-            user: { id: userId, ...userPayload } // Include updated user data in response
+            user: { id: userId, ...userPayload }
         });
 
     } catch (error) {
@@ -72,6 +73,7 @@ router.post('/claim-code', async (req, res) => {
     }
 });
 
+// Route for user login (no changes needed for this specific issue)
 router.post('/login', async (req, res) => {
     console.log("[DEBUG] API call received at /login endpoint.");
     const { email, password } = req.body;
@@ -113,13 +115,12 @@ router.post('/login', async (req, res) => {
         console.log("[DEBUG] Passwords match. Generating token.");
         const token = generateToken(userId);
         
-        // Ensure isNDAAccepted is part of the user payload sent to the frontend
         const { password: _, ...userPayload } = userData;
 
         res.status(200).json({
             message: 'Login successful.',
             token,
-            user: { id: userId, ...userPayload } // Pass the full user data including isNDAAccepted
+            user: { id: userId, ...userPayload }
         });
 
     } catch (error) {
