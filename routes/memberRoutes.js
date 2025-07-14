@@ -1,4 +1,4 @@
-// File: routes/memberRoutes.js - UPDATED (Removed TypeScript type annotation)
+// File: routes/memberRoutes.js - FINAL CORRECTED (All TypeScript type annotations removed)
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -138,7 +138,6 @@ router.put('/connection-preferences', authenticateToken, checkNdaAccepted, async
 
     try {
         const userDocRef = db.collection('users').doc(userId);
-        // FIX: Removed TypeScript type annotation
         const updates = { // Removed explicit type annotation here
             lastConnectionUpdateAt: adminApp.firestore.FieldValue.serverTimestamp(),
         };
@@ -174,10 +173,10 @@ router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) =>
         const currentUserInterests = currentUserData.connectionInterests || [];
 
         const membersRef = db.collection('users');
-        let query: FirebaseFirestore.Query = membersRef;
+        let query = membersRef; // FIX: Removed FirebaseFirestore.Query type annotation
 
         const snapshot = await query.get();
-        const discoverableMembers: Partial<UserData>[] = [];
+        const discoverableMembers = []; // FIX: Removed Partial<UserData>[] type annotation
 
         snapshot.forEach(doc => {
             const memberId = doc.id;
