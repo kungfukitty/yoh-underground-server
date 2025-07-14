@@ -1,4 +1,4 @@
-// File: routes/memberRoutes.js - UPDATED (Add Connection Routes)
+// File: routes/memberRoutes.js - UPDATED (Removed TypeScript type annotation)
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -37,7 +37,6 @@ const checkNdaAccepted = async (req, res, next) => {
     }
 };
 
-// --- NDA Management Route (existing) ---
 router.post('/acknowledge-nda', authenticateToken, async (req, res) => {
     console.log("[DEBUG] API call received at /acknowledge-nda endpoint by user:", req.user.id);
     const userId = req.user.id; 
@@ -74,7 +73,6 @@ router.get('/nda-status', authenticateToken, async (req, res) => {
     }
 });
 
-// --- Personalized Member Profiles Routes (existing) ---
 router.get('/profile', authenticateToken, async (req, res) => {
     console.log("[DEBUG] API call received at /profile GET endpoint for user:", req.user.id);
     const userId = req.user.id;
@@ -99,7 +97,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     console.log("[DEBUG] API call received at /profile PUT endpoint for user:", req.user.id);
     const userId = req.user.id;
     const updates = req.body; 
-    const disallowedFields = ['email', 'password', 'accessCode', 'isClaimed', 'activatedAt', 'isNDAAccepted', 'ndaAcceptedAt', 'connectionInterests', 'connectionVisibility', 'lastConnectionUpdateAt']; // Updated disallowed fields
+    const disallowedFields = ['email', 'password', 'accessCode', 'isClaimed', 'activatedAt', 'isNDAAccepted', 'ndaAcceptedAt', 'connectionInterests', 'connectionVisibility', 'lastConnectionUpdateAt'];
     const forbiddenUpdates = Object.keys(updates).filter(field => disallowedFields.includes(field));
 
     if (forbiddenUpdates.length > 0) {
@@ -129,12 +127,10 @@ router.put('/connection-preferences', authenticateToken, checkNdaAccepted, async
     const userId = req.user.id;
     const { connectionInterests, connectionVisibility } = req.body;
 
-    // Basic validation for connectionInterests (e.g., must be array of strings)
     if (connectionInterests !== undefined && (!Array.isArray(connectionInterests) || !connectionInterests.every(i => typeof i === 'string'))) {
         return res.status(400).json({ message: 'connectionInterests must be an array of strings.' });
     }
 
-    // Basic validation for connectionVisibility
     const allowedVisibilities = ['Visible to all members', 'Visible to members with shared interests', 'Not visible for connections'];
     if (connectionVisibility !== undefined && !allowedVisibilities.includes(connectionVisibility)) {
         return res.status(400).json({ message: 'Invalid connectionVisibility value.' });
@@ -142,7 +138,8 @@ router.put('/connection-preferences', authenticateToken, checkNdaAccepted, async
 
     try {
         const userDocRef = db.collection('users').doc(userId);
-        const updates: { [key: string]: any } = {
+        // FIX: Removed TypeScript type annotation
+        const updates = { // Removed explicit type annotation here
             lastConnectionUpdateAt: adminApp.firestore.FieldValue.serverTimestamp(),
         };
 
@@ -179,50 +176,40 @@ router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) =>
         const membersRef = db.collection('users');
         let query: FirebaseFirestore.Query = membersRef;
 
-        // Filter out the current user
-        // Note: Firestore doesn't allow inequality filters on multiple fields, nor 'not-equal' filters directly on ID
-        // So we'll filter by ID after fetching, or try to optimize the query for 'visible' members.
-
-        const snapshot = await query.get(); // Fetch all (or a reasonable limit) to filter in code
+        const snapshot = await query.get();
         const discoverableMembers: Partial<UserData>[] = [];
 
         snapshot.forEach(doc => {
             const memberId = doc.id;
             const memberData = doc.data();
 
-            // Skip current user
             if (memberId === currentUserId) {
                 return;
             }
 
-            // Apply visibility rules
             if (memberData.connectionVisibility === 'Not visible for connections') {
-                return; // Skip members who don't want to be visible
+                return;
             }
 
-            // Check NDA acceptance for discoverable members (ensure they are active, vetted members)
             if (!memberData.isNDAAccepted) {
-                return; // Only show members who have accepted NDA
+                return;
             }
 
-            // Filter by shared interests if necessary
             if (memberData.connectionVisibility === 'Visible to members with shared interests') {
                 const memberInterests = memberData.connectionInterests || [];
                 const hasSharedInterest = currentUserInterests.some(interest => memberInterests.includes(interest));
                 if (!hasSharedInterest) {
-                    return; // Skip if no shared interests and visibility is restricted
+                    return;
                 }
             }
 
-            // Exclude sensitive information
             const { password, accessCode, isClaimed, activatedAt, isNDAAccepted, ndaAcceptedAt, email, ...discoverableProfile } = memberData;
 
             discoverableMembers.push({
                 id: memberId,
-                name: discoverableProfile.name, // Ensure name is included
-                status: discoverableProfile.status, // Ensure status is included
+                name: discoverableProfile.name,
+                status: discoverableProfile.status,
                 connectionInterests: discoverableProfile.connectionInterests || [],
-                // Add any other non-sensitive fields you want to display
             });
         });
 
