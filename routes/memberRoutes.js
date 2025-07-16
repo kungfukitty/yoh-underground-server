@@ -1,4 +1,4 @@
-// File: routes/memberRoutes.js - FINAL CORRECTED (All TypeScript type annotations removed)
+// File: routes/memberRoutes.js - COMPLETE AND UP-TO-DATE
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -121,7 +121,6 @@ router.put('/profile', authenticateToken, async (req, res) => {
 
 // --- NEW: Discreet Connection Facilitator Routes ---
 
-// PUT /api/member/connection-preferences - Update user's connection preferences
 router.put('/connection-preferences', authenticateToken, checkNdaAccepted, async (req, res) => {
     console.log("[DEBUG] API call received at /connection-preferences PUT endpoint by user:", req.user.id);
     const userId = req.user.id;
@@ -138,7 +137,7 @@ router.put('/connection-preferences', authenticateToken, checkNdaAccepted, async
 
     try {
         const userDocRef = db.collection('users').doc(userId);
-        const updates = { // Removed explicit type annotation here
+        const updates = { 
             lastConnectionUpdateAt: adminApp.firestore.FieldValue.serverTimestamp(),
         };
 
@@ -159,7 +158,7 @@ router.put('/connection-preferences', authenticateToken, checkNdaAccepted, async
     }
 });
 
-// GET /api/members/discover - Discover other members based on preferences
+// GET /api/members/discover - Discover other members based on preferences - UPDATED
 router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) => {
     console.log("[DEBUG] API call received at /discover GET endpoint by user:", req.user.id);
     const currentUserId = req.user.id;
@@ -173,10 +172,10 @@ router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) =>
         const currentUserInterests = currentUserData.connectionInterests || [];
 
         const membersRef = db.collection('users');
-        let query = membersRef; // FIX: Removed FirebaseFirestore.Query type annotation
+        let query = membersRef; // No type annotation needed
 
         const snapshot = await query.get();
-        const discoverableMembers = []; // FIX: Removed Partial<UserData>[] type annotation
+        const discoverableMembers = []; // No type annotation needed
 
         snapshot.forEach(doc => {
             const memberId = doc.id;
@@ -204,11 +203,13 @@ router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) =>
 
             const { password, accessCode, isClaimed, activatedAt, isNDAAccepted, ndaAcceptedAt, email, ...discoverableProfile } = memberData;
 
+            // Ensure connectionInterests are always an array, even if undefined in Firestore
             discoverableMembers.push({
                 id: memberId,
-                name: discoverableProfile.name,
-                status: discoverableProfile.status,
-                connectionInterests: discoverableProfile.connectionInterests || [],
+                name: discoverableProfile.name || 'N/A', // Provide default
+                status: discoverableProfile.status || 'N/A', // Provide default
+                connectionInterests: discoverableProfile.connectionInterests || [], // Ensure it's an array
+                connectionVisibility: discoverableProfile.connectionVisibility || 'Not visible for connections', // Provide default
             });
         });
 
