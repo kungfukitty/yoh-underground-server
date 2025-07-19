@@ -1,4 +1,4 @@
-// File: routes/adminRoutes.js - FINAL CORRECTED (All TypeScript type annotations removed)
+// File: routes/adminRoutes.js - UPDATED (Add Chat Routes)
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -43,7 +43,7 @@ const checkAdmin = async (req, res, next) => {
 };
 
 
-// --- Admin Itinerary Management Routes ---
+// --- Admin Itinerary Management Routes (existing) ---
 
 // POST /api/admin/itineraries - Create a new itinerary
 router.post('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
@@ -55,14 +55,12 @@ router.post('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
     }
 
     try {
-        // Validate dates are valid and convert to Firestore Timestamps
         const parsedStartDate = new Date(startDate);
         const parsedEndDate = new Date(endDate);
         if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
             return res.status(400).json({ message: 'Invalid start or end date format.' });
         }
 
-        // Validate details structure and convert activity dates
         const validatedDetails = details.map(activity => {
             const activityDate = new Date(activity.date);
             if (isNaN(activityDate.getTime()) || !activity.description || !activity.location) {
@@ -83,13 +81,13 @@ router.post('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
             status,
             details: validatedDetails,
             createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            createdBy: req.user.id // Admin user ID
+            createdBy: req.user.id
         };
 
         const docRef = await db.collection('itineraries').add(newItinerary);
         res.status(201).json({ message: 'Itinerary created successfully.', id: docRef.id });
 
-    } catch (error) { // Removed :any
+    } catch (error) {
         console.error('Error creating itinerary:', error);
         res.status(500).json({ message: error.message || 'Server error creating itinerary.' });
     }
@@ -98,27 +96,26 @@ router.post('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
 // GET /api/admin/itineraries - Retrieve all itineraries (or by userId)
 router.get('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
     console.log("[DEBUG] API call received at /admin/itineraries GET endpoint.");
-    const { userId } = req.query; // Optional filter by userId
+    const { userId } = req.query;
 
     try {
-        let query = db.collection('itineraries'); // Removed type annotation
+        let query = db.collection('itineraries');
         if (userId) {
             query = query.where('userId', '==', userId);
         }
 
         const snapshot = await query.get();
-        const itineraries = []; // Removed type annotation
+        const itineraries = [];
         snapshot.forEach(doc => {
             const data = doc.data();
             itineraries.push({
                 id: doc.id,
                 ...data,
-                // Convert Timestamps to ISO strings
                 startDate: data.startDate?.toDate().toISOString() || null,
                 endDate: data.endDate?.toDate().toISOString() || null,
                 createdAt: data.createdAt?.toDate().toISOString() || null,
                 updatedAt: data.updatedAt?.toDate().toISOString() || null,
-                details: data.details ? data.details.map(detail => ({ // Removed :any
+                details: data.details ? data.details.map(detail => ({
                     ...detail,
                     date: detail.date?.toDate().toISOString() || null
                 })) : []
@@ -149,12 +146,11 @@ router.get('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) =
         const itinerary = {
             id: doc.id,
             ...data,
-            // Convert Timestamps to ISO strings
             startDate: data.startDate?.toDate().toISOString() || null,
             endDate: data.endDate?.toDate().toISOString() || null,
             createdAt: data.createdAt?.toDate().toISOString() || null,
             updatedAt: data.updatedAt?.toDate().toISOString() || null,
-            details: data.details ? data.details.map(detail => ({ // Removed :any
+            details: data.details ? data.details.map(detail => ({
                 ...detail,
                 date: detail.date?.toDate().toISOString() || null
             })) : []
@@ -182,7 +178,6 @@ router.put('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) =
             return res.status(404).json({ message: 'Itinerary not found.' });
         }
 
-        // Handle specific fields that might need conversion before update
         if (updates.startDate) {
             const parsedDate = new Date(updates.startDate);
             if (isNaN(parsedDate.getTime())) return res.status(400).json({ message: 'Invalid startDate format.' });
@@ -194,7 +189,7 @@ router.put('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) =
             updates.endDate = adminApp.firestore.Timestamp.fromDate(parsedDate);
         }
         if (updates.details && Array.isArray(updates.details)) {
-            updates.details = updates.details.map(activity => { // Removed :any
+            updates.details = updates.details.map(activity => {
                 if (activity.date) {
                     const activityDate = new Date(activity.date);
                     if (isNaN(activityDate.getTime())) throw new Error('Invalid activity date format in details.');
@@ -209,7 +204,7 @@ router.put('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) =
         await itineraryRef.update(updates);
         res.status(200).json({ message: 'Itinerary updated successfully.' });
 
-    } catch (error) { // Removed :any
+    } catch (error) {
         console.error('Error updating itinerary:', error);
         res.status(500).json({ message: error.message || 'Server error updating itinerary.' });
     }
@@ -226,6 +221,182 @@ router.delete('/itineraries/:id', authenticateToken, checkAdmin, async (req, res
     } catch (error) {
         console.error('Error deleting itinerary:', error);
         res.status(500).json({ message: 'Server error deleting itinerary.' });
+    }
+});
+
+
+// --- NEW: Admin Chat Management Routes ---
+
+// POST /api/admin/chats - Create a new chat log
+router.post('/chats', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/chats POST endpoint.");
+    const { userIds, messages, itineraryId, subject, status = 'Open' } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0 || !messages || !Array.isArray(messages) || messages.length === 0) {
+        return res.status(400).json({ message: 'Missing required chat fields (userIds, messages).' });
+    }
+
+    try {
+        // Basic validation for messages: ensure senderId, text, and timestamp are present
+        const validatedMessages = messages.map(message => {
+            const messageTimestamp = new Date(message.timestamp);
+            if (isNaN(messageTimestamp.getTime()) || !message.senderId || !message.text) {
+                throw new Error('Invalid chat message format.');
+            }
+            return {
+                ...message,
+                timestamp: adminApp.firestore.Timestamp.fromDate(messageTimestamp)
+            };
+        });
+
+        const newChatLog = {
+            userIds,
+            messages: validatedMessages,
+            itineraryId: itineraryId || null,
+            subject: subject || null,
+            status,
+            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
+            lastActivityAt: adminApp.firestore.FieldValue.serverTimestamp(),
+            createdBy: req.user.id // Admin user ID who created the chat
+        };
+
+        const docRef = await db.collection('chatLogs').add(newChatLog);
+        res.status(201).json({ message: 'Chat log created successfully.', id: docRef.id });
+
+    } catch (error) {
+        console.error('Error creating chat log:', error);
+        res.status(500).json({ message: error.message || 'Server error creating chat log.' });
+    }
+});
+
+// GET /api/admin/chats - Retrieve all chat logs (with filters)
+router.get('/chats', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/chats GET endpoint.");
+    const { userId, status, itineraryId } = req.query; // Optional filters
+
+    try {
+        let query = db.collection('chatLogs');
+
+        if (userId) {
+            query = query.where('userIds', 'array-contains', userId);
+        }
+        if (status) {
+            query = query.where('status', '==', status);
+        }
+        if (itineraryId) {
+            query = query.where('itineraryId', '==', itineraryId);
+        }
+
+        const snapshot = await query.orderBy('lastActivityAt', 'desc').get();
+        const chatLogs = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            chatLogs.push({
+                id: doc.id,
+                ...data,
+                createdAt: data.createdAt?.toDate().toISOString() || null,
+                lastActivityAt: data.lastActivityAt?.toDate().toISOString() || null,
+                messages: data.messages ? data.messages.map(message => ({
+                    ...message,
+                    timestamp: message.timestamp?.toDate().toISOString() || null
+                })) : []
+            });
+        });
+
+        res.status(200).json({ message: 'Chat logs retrieved successfully.', chatLogs });
+
+    } catch (error) {
+        console.error('Error retrieving chat logs:', error);
+        res.status(500).json({ message: 'Server error retrieving chat logs.' });
+    }
+});
+
+// GET /api/admin/chats/:id - Retrieve a specific chat log
+router.get('/chats/:id', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/chats/:id GET endpoint.");
+    const chatId = req.params.id;
+
+    try {
+        const doc = await db.collection('chatLogs').doc(chatId).get();
+
+        if (!doc.exists) {
+            return res.status(404).json({ message: 'Chat log not found.' });
+        }
+
+        const data = doc.data();
+        const chatLog = {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate().toISOString() || null,
+            lastActivityAt: data.lastActivityAt?.toDate().toISOString() || null,
+            messages: data.messages ? data.messages.map(message => ({
+                ...message,
+                timestamp: message.timestamp?.toDate().toISOString() || null
+            })) : []
+        };
+
+        res.status(200).json({ message: 'Chat log retrieved successfully.', chatLog });
+
+    } catch (error) {
+        console.error('Error retrieving chat log by ID:', error);
+        res.status(500).json({ message: 'Server error retrieving chat log.' });
+    }
+});
+
+// PUT /api/admin/chats/:id - Update a chat log (e.g., add messages, change status)
+router.put('/chats/:id', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/chats/:id PUT endpoint.");
+    const chatId = req.params.id;
+    const updates = req.body;
+
+    try {
+        const chatLogRef = db.collection('chatLogs').doc(chatId);
+        const chatLogDoc = await chatLogRef.get();
+
+        if (!chatLogDoc.exists) {
+            return res.status(404).json({ message: 'Chat log not found.' });
+        }
+
+        // Handle adding new messages
+        if (updates.messages && Array.isArray(updates.messages)) {
+            // Fetch current messages to append to them
+            const currentMessages = chatLogDoc.data().messages || [];
+            const newMessages = updates.messages.map(message => {
+                const messageTimestamp = new Date(message.timestamp);
+                if (isNaN(messageTimestamp.getTime()) || !message.senderId || !message.text) {
+                    throw new Error('Invalid new message format.');
+                }
+                return {
+                    ...message,
+                    timestamp: adminApp.firestore.Timestamp.fromDate(messageTimestamp)
+                };
+            });
+            updates.messages = [...currentMessages, ...newMessages]; // Append new messages
+        }
+
+        // Update lastActivityAt timestamp
+        updates.lastActivityAt = adminApp.firestore.FieldValue.serverTimestamp();
+
+        await chatLogRef.update(updates);
+        res.status(200).json({ message: 'Chat log updated successfully.' });
+
+    } catch (error) {
+        console.error('Error updating chat log:', error);
+        res.status(500).json({ message: error.message || 'Server error updating chat log.' });
+    }
+});
+
+// DELETE /api/admin/chats/:id - Delete a chat log
+router.delete('/chats/:id', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/chats/:id DELETE endpoint.");
+    const chatId = req.params.id;
+
+    try {
+        await db.collection('chatLogs').doc(chatId).delete();
+        res.status(200).json({ message: 'Chat log deleted successfully.' });
+    } catch (error) {
+        console.error('Error deleting chat log:', error);
+        res.status(500).json({ message: 'Server error deleting chat log.' });
     }
 });
 
