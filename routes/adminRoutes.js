@@ -1,15 +1,15 @@
-// File: routes/adminRoutes.js
+// File: routes/adminRoutes.js - FINAL CORRECTED (All TypeScript type annotations removed)
 
 import { Router } from 'express';
-import { db, adminApp } from '../config/firebaseAdminInit.js'; // Import db and adminApp
+import { db, adminApp } from '../config/firebaseAdminInit.js';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
 
-// Middleware to authenticate token (re-using from memberRoutes)
+// Middleware to authenticate token
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1]; 
 
     if (token == null) {
         return res.status(401).json({ message: 'Authentication token required.' });
@@ -20,7 +20,7 @@ const authenticateToken = (req, res, next) => {
             console.error("[DEBUG] JWT verification failed:", err.message);
             return res.status(403).json({ message: 'Invalid or expired token.' });
         }
-        req.user = user; // Attach user payload from token
+        req.user = user; 
         next();
     });
 };
@@ -89,7 +89,7 @@ router.post('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
         const docRef = await db.collection('itineraries').add(newItinerary);
         res.status(201).json({ message: 'Itinerary created successfully.', id: docRef.id });
 
-    } catch (error: any) {
+    } catch (error) { // Removed :any
         console.error('Error creating itinerary:', error);
         res.status(500).json({ message: error.message || 'Server error creating itinerary.' });
     }
@@ -101,13 +101,13 @@ router.get('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
     const { userId } = req.query; // Optional filter by userId
 
     try {
-        let query: FirebaseFirestore.Query = db.collection('itineraries');
+        let query = db.collection('itineraries'); // Removed type annotation
         if (userId) {
             query = query.where('userId', '==', userId);
         }
 
         const snapshot = await query.get();
-        const itineraries: any[] = [];
+        const itineraries = []; // Removed type annotation
         snapshot.forEach(doc => {
             const data = doc.data();
             itineraries.push({
@@ -118,7 +118,7 @@ router.get('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
                 endDate: data.endDate?.toDate().toISOString() || null,
                 createdAt: data.createdAt?.toDate().toISOString() || null,
                 updatedAt: data.updatedAt?.toDate().toISOString() || null,
-                details: data.details ? data.details.map((detail: any) => ({
+                details: data.details ? data.details.map(detail => ({ // Removed :any
                     ...detail,
                     date: detail.date?.toDate().toISOString() || null
                 })) : []
@@ -154,7 +154,7 @@ router.get('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) =
             endDate: data.endDate?.toDate().toISOString() || null,
             createdAt: data.createdAt?.toDate().toISOString() || null,
             updatedAt: data.updatedAt?.toDate().toISOString() || null,
-            details: data.details ? data.details.map((detail: any) => ({
+            details: data.details ? data.details.map(detail => ({ // Removed :any
                 ...detail,
                 date: detail.date?.toDate().toISOString() || null
             })) : []
@@ -194,7 +194,7 @@ router.put('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) =
             updates.endDate = adminApp.firestore.Timestamp.fromDate(parsedDate);
         }
         if (updates.details && Array.isArray(updates.details)) {
-            updates.details = updates.details.map((activity: any) => {
+            updates.details = updates.details.map(activity => { // Removed :any
                 if (activity.date) {
                     const activityDate = new Date(activity.date);
                     if (isNaN(activityDate.getTime())) throw new Error('Invalid activity date format in details.');
@@ -209,7 +209,7 @@ router.put('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) =
         await itineraryRef.update(updates);
         res.status(200).json({ message: 'Itinerary updated successfully.' });
 
-    } catch (error: any) {
+    } catch (error) { // Removed :any
         console.error('Error updating itinerary:', error);
         res.status(500).json({ message: error.message || 'Server error updating itinerary.' });
     }
