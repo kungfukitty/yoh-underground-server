@@ -1,10 +1,9 @@
-// File: server.js - COMPLETE AND UP-TO-DATE (Production Version)
+// File: server.js - COMPLETE AND UP-TO-DATE (Production Version with CORS fix)
 
 console.log("SERVER START: Entering server.js execution.");
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-// Import all necessary components from firebaseAdminInit.js
 import { auth, db, bucket, adminApp } from './config/firebaseAdminInit.js'; 
 
 
@@ -12,7 +11,6 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// --- Server Startup Debugging & JWT Secret Check ---
 console.log("DEBUG: Server starting...");
 
 const jwtSecret = process.env.JWT_SECRET;
@@ -23,11 +21,20 @@ if (!jwtSecret) {
 } else {
     console.log("DEBUG: JWT_SECRET is set (length:", jwtSecret.length, ")");
 }
-// --- END Server Startup Debugging & JWT Secret Check ---
 
+// --- CORS Configuration FIX ---
+// Replace 'http://www.yohunderground.fun' with your actual frontend domain
+const corsOptions = {
+    origin: 'http://www.yohunderground.fun', // Explicitly allow your frontend domain
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Allow common HTTP methods
+    credentials: true, // Allow cookies to be sent with requests (if any are used)
+    optionsSuccessStatus: 204 // Some legacy browsers (IE11, various SmartTVs) choke on 200
+};
+app.use(cors(corsOptions)); // Apply CORS with specific options
+// --- END CORS Configuration FIX ---
 
-app.use(cors());
-app.use(express.json());
+app.use(express.json()); // This should come after CORS if you have preflight issues with JSON content-type
+
 
 app.get('/', (req, res) => {
     res.status(200).json({
