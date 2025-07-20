@@ -1,4 +1,4 @@
-// File: config/firebaseAdminInit.js - COMPLETE AND UP-TO-DATE
+// File: config/firebaseAdminInit.js - COMPLETE AND UP-TO-DATE (Reconfirming Integrity)
 
 import admin from 'firebase-admin';
 import { Storage } from '@google-cloud/storage'; 
@@ -11,7 +11,6 @@ let initializedDb;
 let initializedStorage; 
 
 
-// Ensure Firebase Admin SDK is initialized only once
 if (!admin.apps.length) {
   if (!serviceAccountJsonString) {
     console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON is NOT set or is empty! Cannot initialize Firebase Admin SDK.");
@@ -58,7 +57,6 @@ if (!admin.apps.length) {
     }).bucket(`${serviceAccount.project_id}.appspot.com`);
 }
 
-// Export the initialized auth, db, storage, AND admin instances for use in other modules
 export const adminApp = admin; 
 export const auth = initializedAuth;
 export const db = initializedDb;
