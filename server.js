@@ -1,10 +1,9 @@
-// File: server.js - Final Review: OK
+// File: server.js - COMPLETE AND UP-TO-DATE (Production Version with CORS fix)
 
 console.log("SERVER START: Entering server.js execution.");
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-// Import all necessary components from firebaseAdminInit.js
 import { auth, db, bucket, adminApp } from './config/firebaseAdminInit.js'; 
 
 
@@ -23,16 +22,18 @@ if (!jwtSecret) {
     console.log("DEBUG: JWT_SECRET is set (length:", jwtSecret.length, ")");
 }
 
-// CORS Configuration
+// --- CORS Configuration FIX ---
+// Replace 'http://www.yohunderground.fun' with your actual frontend domain
 const corsOptions = {
     origin: 'http://www.yohunderground.fun', // Explicitly allow your frontend domain
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE', // Allow common HTTP methods
     credentials: true, // Allow cookies to be sent with requests (if any are used)
     optionsSuccessStatus: 204 // Some legacy browsers (IE11, various SmartTVs) choke on 200
 };
-app.use(cors(corsOptions));
+app.use(cors(corsOptions)); // Apply CORS with specific options
+// --- END CORS Configuration FIX ---
 
-app.use(express.json());
+app.use(express.json()); // This should come after CORS if you have preflight issues with JSON content-type
 
 
 app.get('/', (req, res) => {
@@ -56,7 +57,7 @@ app.use('/api/member', memberRoutes);
 import eventRoutes from './routes/eventRoutes.js';
 app.use('/api/events', eventRoutes);
 
-// Admin Routes (Itineraries, Chats, Networks, etc.)
+// Admin Routes (Itineraries, Chats, Networks)
 import adminRoutes from './routes/adminRoutes.js';
 app.use('/api/admin', adminRoutes);
 
