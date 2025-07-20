@@ -119,3 +119,13 @@ router.get('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
         });
 
         res.status(200).json({ message: 'Itineraries retrieved successfully.', itineraries });
+         res.status(200).json({ message: 'Itineraries retrieved successfully.', itineraries });
+    } catch (error) {
+        console.error('Error retrieving itineraries:', error);
+        res.status(500).json({ message: error.message || 'Server error retrieving itineraries.' });
+    }
+});
+
+// You may have more routes here...
+
+export default router;
