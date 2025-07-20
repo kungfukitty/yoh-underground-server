@@ -1,4 +1,4 @@
-// File: server.js - TEMPORARY MINIMAL DEBUGGING VERSION
+// File: server.js - TEMPORARY MINIMAL DEBUGGING VERSION (Re-created)
 
 console.log("DEBUG: Starting minimal server...");
 import express from 'express';
