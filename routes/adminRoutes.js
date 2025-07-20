@@ -1,4 +1,4 @@
-// File: routes/adminRoutes.js - COMPLETE AND UP-TO-DATE (Reconfirming Integrity)
+// File: routes/adminRoutes.js - Final Review: OK
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -385,7 +385,7 @@ router.delete('/chats/:id', authenticateToken, checkAdmin, async (req, res) => {
 });
 
 
-// --- NEW: Admin Network Management Routes (existing) ---
+// --- Admin Network Management Routes (existing) ---
 
 router.post('/networks', authenticateToken, checkAdmin, async (req, res) => {
     console.log("[DEBUG] API call received at /admin/networks POST endpoint.");
