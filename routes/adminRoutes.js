@@ -1,4 +1,4 @@
-// File: routes/adminRoutes.js - Final Review: OK
+// File: routes/adminRoutes.js - UPDATED (Add Resource Routes)
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -486,61 +486,4 @@ router.get('/networks/:id', authenticateToken, checkAdmin, async (req, res) => {
         res.status(200).json({ message: 'Network retrieved successfully.', network });
 
     } catch (error) {
-        console.error('Error retrieving network by ID:', error);
-        res.status(500).json({ message: 'Server error retrieving network.' });
-    }
-});
-
-router.put('/networks/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/networks/:id PUT endpoint.");
-    const networkId = req.params.id;
-    const updates = req.body;
-
-    try {
-        const networkRef = db.collection('networks').doc(networkId);
-        const networkDoc = await networkRef.get();
-
-        if (!networkDoc.exists) {
-            return res.status(404).json({ message: 'Network not found.' });
-        }
-
-        const allowedTypes = ['Professional', 'Social', 'Interest-Based'];
-        if (updates.type !== undefined && !allowedTypes.includes(updates.type)) {
-            return res.status(400).json({ message: 'Invalid network type. Must be Professional, Social, or Interest-Based.' });
-        }
-
-        const allowedVisibilities = ['Public', 'Private'];
-        if (updates.visibility !== undefined && !allowedVisibilities.includes(updates.visibility)) {
-            return res.status(400).json({ message: 'Invalid network visibility. Must be Public or Private.' });
-        }
-
-        if (updates.members !== undefined && (!Array.isArray(updates.members) || !updates.members.every(m => typeof m === 'string'))) {
-            return res.status(400).json({ message: 'Network members must be an array of strings (User IDs).' });
-        }
-
-        updates.updatedAt = adminApp.firestore.FieldValue.serverTimestamp();
-
-        await networkRef.update(updates);
-        res.status(200).json({ message: 'Network updated successfully.' });
-
-    } catch (error) {
-        console.error('Error updating network:', error);
-        res.status(500).json({ message: error.message || 'Server error updating network.' });
-    }
-});
-
-router.delete('/networks/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/networks/:id DELETE endpoint.");
-    const networkId = req.params.id;
-
-    try {
-        await db.collection('networks').doc(networkId).delete();
-        res.status(200).json({ message: 'Network deleted successfully.' });
-    } catch (error) {
-        console.error('Error deleting network:', error);
-        res.status(500).json({ message: 'Server error deleting network.' });
-    }
-});
-
-
-export default router;
+        console.error('Error retrieving network by ID
