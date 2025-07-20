@@ -1,13 +1,29 @@
-// File: server.js
-// ... other imports ...
-import authRoutes from './routes/authRoutes.js';
-app.use('/api/auth', authRoutes);
+// File: server.js - TEMPORARY MINIMAL DEBUGGING VERSION
 
-// Comment these out:
-// import memberRoutes from './routes/memberRoutes.js';
-// app.use('/api/member', memberRoutes);
-// import eventRoutes from './routes/eventRoutes.js';
-// app.use('/api/events', eventRoutes);
-// import adminRoutes from './routes/adminRoutes.js';
-// app.use('/api/admin', adminRoutes);
-// ... rest of server.js
+console.log("DEBUG: Starting minimal server...");
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+
+dotenv.config(); // Load environment variables first
+
+const app = express(); // Initialize Express app
+const PORT = process.env.PORT || 5000;
+
+app.use(cors());
+app.use(express.json());
+
+// Basic route that does not depend on any other modules or Firebase
+app.get('/', (req, res) => {
+    res.status(200).json({
+        message: "Minimal server is operational.",
+        status: "OK",
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.listen(PORT, () => {
+    console.log(`Minimal server is running on port ${PORT}`);
+});
+
+export default app; // Essential for Vercel deployment
