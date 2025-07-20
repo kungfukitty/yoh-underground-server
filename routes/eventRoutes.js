@@ -1,4 +1,4 @@
-// File: routes/eventRoutes.js - UPDATED (Convert event.date to ISO string)
+// File: routes/eventRoutes.js - COMPLETE AND UP-TO-DATE (Reconfirming Integrity)
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -37,9 +37,6 @@ const checkNdaAccepted = async (req, res, next) => {
     }
 };
 
-// --- Event Routes ---
-
-// GET /api/events - Get a list of upcoming events - UPDATED
 router.get('/', authenticateToken, checkNdaAccepted, async (req, res) => {
     console.log("[DEBUG] API call received at /events GET endpoint.");
     try {
@@ -55,9 +52,7 @@ router.get('/', authenticateToken, checkNdaAccepted, async (req, res) => {
             events.push({
                 id: doc.id,
                 ...eventData,
-                // --- FIX START: Convert date Timestamp to ISO string here ---
                 date: eventData.date && typeof eventData.date.toDate === 'function' ? eventData.date.toDate().toISOString() : eventData.date,
-                // --- FIX END ---
             });
         });
 
@@ -72,7 +67,6 @@ router.get('/', authenticateToken, checkNdaAccepted, async (req, res) => {
     }
 });
 
-// POST /api/events/:eventId/rsvp (existing)
 router.post('/:eventId/rsvp', authenticateToken, checkNdaAccepted, async (req, res) => {
     const eventId = req.params.eventId;
     const userId = req.user.id;
@@ -110,7 +104,6 @@ router.post('/:eventId/rsvp', authenticateToken, checkNdaAccepted, async (req, r
     }
 });
 
-// DELETE /api/events/:eventId/rsvp (existing)
 router.delete('/:eventId/rsvp', authenticateToken, checkNdaAccepted, async (req, res) => {
     const eventId = req.params.eventId;
     const userId = req.user.id;
