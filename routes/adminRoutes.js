@@ -8,7 +8,7 @@ const router = Router();
 
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; 
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (token == null) {
         return res.status(401).json({ message: 'Authentication token required.' });
@@ -19,7 +19,7 @@ const authenticateToken = (req, res, next) => {
             console.error("[DEBUG] JWT verification failed:", err.message);
             return res.status(403).json({ message: 'Invalid or expired token.' });
         }
-        req.user = user; 
+        req.user = user;
         next();
     });
 };
@@ -192,7 +192,7 @@ router.put('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) =
                 return activity;
             });
         }
-        
+
         updates.updatedAt = adminApp.firestore.FieldValue.serverTimestamp();
 
         await itineraryRef.update(updates);
@@ -394,7 +394,7 @@ router.post('/networks', authenticateToken, checkAdmin, async (req, res) => {
     if (!name || !type || !visibility) {
         return res.status(400).json({ message: 'Missing required network fields (name, type, visibility).' });
     }
-    
+
     const allowedTypes = ['Professional', 'Social', 'Interest-Based'];
     if (!allowedTypes.includes(type)) {
         return res.status(400).json({ message: 'Invalid network type. Must be Professional, Social, or Interest-Based.' });
@@ -525,4 +525,21 @@ router.put('/networks/:id', authenticateToken, checkAdmin, async (req, res) => {
 
     } catch (error) {
         console.error('Error updating network:', error);
-        res.status(500).json({ message: error.message || 'Server error updating
+        res.status(500).json({ message: error.message || 'Server error updating network.' });
+    }
+});
+
+router.delete('/networks/:id', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/networks/:id DELETE endpoint.");
+    const networkId = req.params.id;
+
+    try {
+        await db.collection('networks').doc(networkId).delete();
+        res.status(200).json({ message: 'Network deleted successfully.' });
+    } catch (error) {
+        console.error('Error deleting network:', error);
+        res.status(500).json({ message: 'Server error deleting network.' });
+    }
+});
+
+export default router;
