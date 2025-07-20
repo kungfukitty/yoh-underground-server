@@ -1,4 +1,4 @@
-// File: routes/memberRoutes.js - COMPLETE AND UP-TO-DATE
+// File: routes/memberRoutes.js - Final Review: OK
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -69,7 +69,7 @@ router.get('/nda-status', authenticateToken, async (req, res) => {
         res.status(200).json({ message: 'NDA status retrieved successfully.', isNDAAccepted: isNDAAccepted, ndaAcceptedAt: ndaAcceptedAt });
     } catch (error) {
         console.error('Error retrieving NDA status:', error);
-        res.status(500).json({ message: 'Server error during NDA status retrieval.' });
+        res.status(500).json({ message: 'Server error retrieving NDA status.' });
     }
 });
 
@@ -119,8 +119,6 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-// --- NEW: Discreet Connection Facilitator Routes ---
-
 router.put('/connection-preferences', authenticateToken, checkNdaAccepted, async (req, res) => {
     console.log("[DEBUG] API call received at /connection-preferences PUT endpoint by user:", req.user.id);
     const userId = req.user.id;
@@ -158,7 +156,6 @@ router.put('/connection-preferences', authenticateToken, checkNdaAccepted, async
     }
 });
 
-// GET /api/members/discover - Discover other members based on preferences - UPDATED
 router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) => {
     console.log("[DEBUG] API call received at /discover GET endpoint by user:", req.user.id);
     const currentUserId = req.user.id;
@@ -172,10 +169,10 @@ router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) =>
         const currentUserInterests = currentUserData.connectionInterests || [];
 
         const membersRef = db.collection('users');
-        let query = membersRef; // No type annotation needed
+        let query = membersRef;
 
         const snapshot = await query.get();
-        const discoverableMembers = []; // No type annotation needed
+        const discoverableMembers = [];
 
         snapshot.forEach(doc => {
             const memberId = doc.id;
@@ -203,13 +200,12 @@ router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) =>
 
             const { password, accessCode, isClaimed, activatedAt, isNDAAccepted, ndaAcceptedAt, email, ...discoverableProfile } = memberData;
 
-            // Ensure connectionInterests are always an array, even if undefined in Firestore
             discoverableMembers.push({
                 id: memberId,
-                name: discoverableProfile.name || 'N/A', // Provide default
-                status: discoverableProfile.status || 'N/A', // Provide default
-                connectionInterests: discoverableProfile.connectionInterests || [], // Ensure it's an array
-                connectionVisibility: discoverableProfile.connectionVisibility || 'Not visible for connections', // Provide default
+                name: discoverableProfile.name || 'N/A',
+                status: discoverableProfile.status || 'N/A',
+                connectionInterests: discoverableProfile.connectionInterests || [],
+                connectionVisibility: discoverableProfile.connectionVisibility || 'Not visible for connections',
             });
         });
 
