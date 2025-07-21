@@ -544,6 +544,71 @@ router.delete('/networks/:id', authenticateToken, checkAdmin, async (req, res) =
 
 
 // --- Admin Resource Management Routes (NEW) ---
+// --- Admin Villa Booking Routes (NEW) ---
+});
+    // Delete a villa booking
+router.delete('/villas/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Update a villa booking
+router.put('/villas/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Get a specific villa booking
+router.get('/villas/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Get all villa bookings
+router.get('/villas', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Create a new villa booking
+router.post('/villas', authenticateToken, checkAdmin, async (req, res) => {
+
+// --- Admin Referral Management Routes (NEW) ---
+});
+    // Delete a referral
+router.delete('/referrals/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Update a referral
+router.put('/referrals/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Get a specific referral
+router.get('/referrals/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Get all referrals
+router.get('/referrals', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Create a new referral
+router.post('/referrals', authenticateToken, checkAdmin, async (req, res) => {
+
+// --- Admin Exclusive Offers Routes (NEW) ---
+});
+    // Delete an exclusive offer
+router.delete('/offers/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Update an exclusive offer
+router.put('/offers/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Get a specific exclusive offer
+router.get('/offers/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Get all exclusive offers
+router.get('/offers', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Create a new exclusive offer
+router.post('/offers', authenticateToken, checkAdmin, async (req, res) => {
+
+// --- Admin Security Logs Routes (NEW) ---
+});
+    // Delete a security log
+router.delete('/security/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Get a specific security log
+router.get('/security/:id', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Get all security logs
+router.get('/security', authenticateToken, checkAdmin, async (req, res) => {
+});
+    // Log a security event
+router.post('/security', authenticateToken, checkAdmin, async (req, res) => {
+
 
 router.post('/resources', authenticateToken, checkAdmin, async (req, res) => {
     console.log("[DEBUG] API call received at /admin/resources POST endpoint.");
