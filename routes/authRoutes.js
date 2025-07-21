@@ -1,19 +1,21 @@
-// File: routes/authRoutes.js - Final Review: OK
-
 import { Router } from 'express';
-import { adminApp, db } from '../config/firebaseAdminInit.js';
+import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
 
 const generateToken = (userId) => {
-    console.log("[DEBUG] Generating JWT for user:", userId);
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+        console.error('FATAL ERROR: JWT_SECRET is not defined in environment variables.');
+        return null;
+    }
+    return jwt.sign({ id: userId }, secret, { expiresIn: '24h' });
 };
 
 router.post('/claim-code', async (req, res) => {
-    console.log("[DEBUG] API call received at /claim-code endpoint.");
+    const db = admin.firestore();
     const { accessCode, password } = req.body;
 
     if (!accessCode || !password) {
@@ -22,49 +24,50 @@ router.post('/claim-code', async (req, res) => {
 
     try {
         const usersRef = db.collection('users');
-        const snapshot = await usersRef.where('accessCode', '==', accessCode).limit(1).get();
+        // --- NEW METHOD: Get ALL users to bypass any query/indexing issues ---
+        const snapshot = await usersRef.get();
 
         if (snapshot.empty) {
-            console.log(`[DEBUG] Query for accessCode "${accessCode}" found no documents.`);
+            return res.status(404).json({ message: 'No users found in the database.' });
+        }
+
+        let foundUser = null;
+        let foundDocId = null;
+
+        // --- NEW METHOD: Manually search through the users in the code ---
+        snapshot.forEach(doc => {
+            const userData = doc.data();
+            // Check for a match with or without the quotes, just in case
+            if (userData.accessCode === accessCode || userData.accessCode === `"${accessCode}"`) {
+                foundUser = userData;
+                foundDocId = doc.id;
+            }
+        });
+
+        if (!foundUser) {
             return res.status(404).json({ message: 'Invalid or expired access code.' });
         }
 
-        let userId, userData;
-        snapshot.forEach(doc => {
-            userId = doc.id;
-            userData = doc.data();
-        });
-
-        if (userData.isClaimed) {
+        if (foundUser.isClaimed) {
             return res.status(400).json({ message: 'Access code has already been used.' });
         }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        const userDocRef = usersRef.doc(userId);
+        const userDocRef = usersRef.doc(foundDocId);
         await userDocRef.update({
             password: hashedPassword,
             isClaimed: true,
-            accessCode: adminApp.firestore.FieldValue.delete(),
-            activatedAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            isNDAAccepted: false,
-            name: userData.name || userData.email.split('@')[0] || 'New Member',
-            status: userData.status || 'Active',
+            accessCode: admin.firestore.FieldValue.delete(),
+            activatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        const updatedUserDoc = await userDocRef.get();
-        const updatedUserData = updatedUserDoc.data();
-        const token = generateToken(userId);
-
-        const { password: _, accessCode: __, ...userPayload } = updatedUserData;
-
-
-        res.status(200).json({
-            message: 'Account activated successfully.',
-            token,
-            user: { id: userId, ...userPayload }
-        });
+        const token = generateToken(foundDocId);
+        if (!token) {
+            return res.status(500).json({ message: 'Server configuration error: Could not generate token.' });
+        }
+        res.status(200).json({ message: 'Account activated successfully.', token });
 
     } catch (error) {
         console.error('Error claiming access code:', error);
@@ -73,7 +76,7 @@ router.post('/claim-code', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-    console.log("[DEBUG] API call received at /login endpoint.");
+    const db = admin.firestore();
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -81,12 +84,10 @@ router.post('/login', async (req, res) => {
     }
 
     try {
-        console.log("[DEBUG] Querying Firestore for email:", email);
         const usersRef = db.collection('users');
         const snapshot = await usersRef.where('email', '==', email).limit(1).get();
 
         if (snapshot.empty) {
-            console.log("[DEBUG] No user found for email:", email);
             return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
@@ -95,30 +96,25 @@ router.post('/login', async (req, res) => {
             userId = doc.id;
             userData = doc.data();
         });
-        console.log("[DEBUG] User found:", userId);
 
         if (!userData.password) {
-            console.log("[DEBUG] User has no password, account not activated.");
             return res.status(401).json({ message: 'Account not yet activated.' });
         }
 
-        console.log("[DEBUG] Comparing passwords...");
         const isMatch = await bcrypt.compare(password, userData.password);
 
         if (!isMatch) {
-            console.log("[DEBUG] Password comparison failed.");
             return res.status(401).json({ message: 'Invalid credentials.' });
         }
 
-        console.log("[DEBUG] Passwords match. Generating token.");
         const token = generateToken(userId);
-        
-        const { password: _, ...userPayload } = userData;
-
+        if (!token) {
+            return res.status(500).json({ message: 'Server configuration error: Could not generate token.' });
+        }
         res.status(200).json({
             message: 'Login successful.',
             token,
-            user: { id: userId, ...userPayload }
+            user: { id: userId, name: userData.name, email: userData.email, isAdmin: userData.isAdmin || false }
         });
 
     } catch (error) {
