@@ -1,6 +1,10 @@
 // File: server.js - COMPLETE AND UP-TO-DATE (Production Version with CORS fix)
 
 console.log("SERVER START: Entering server.js execution.");
+import villaRoutes from './routes/villaRoutes.js';
+import referralRoutes from './routes/referralRoutes.js';
+import offerRoutes from './routes/offerRoutes.js';
+import securityRoutes from './routes/securityRoutes.js';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
