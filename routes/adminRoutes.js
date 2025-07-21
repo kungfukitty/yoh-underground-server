@@ -1,4 +1,4 @@
-// File: routes/adminRoutes.js - FINAL CORRECTED BACKEND VERSION
+// File: routes/adminRoutes.js - ABSOLUTELY FINAL CORRECTED BACKEND VERSION
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -8,7 +8,7 @@ const router = Router();
 
 const authenticateToken = (req, res, next) => {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = authHeader && authHeader.split(' ')[1]; 
 
     if (token == null) {
         return res.status(401).json({ message: 'Authentication token required.' });
@@ -19,7 +19,7 @@ const authenticateToken = (req, res, next) => {
             console.error("[DEBUG] JWT verification failed:", err.message);
             return res.status(403).json({ message: 'Invalid or expired token.' });
         }
-        req.user = user;
+        req.user = user; 
         next();
     });
 };
@@ -192,7 +192,7 @@ router.put('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) =
                 return activity;
             });
         }
-
+        
         updates.updatedAt = adminApp.firestore.FieldValue.serverTimestamp();
 
         await itineraryRef.update(updates);
@@ -394,7 +394,7 @@ router.post('/networks', authenticateToken, checkAdmin, async (req, res) => {
     if (!name || !type || !visibility) {
         return res.status(400).json({ message: 'Missing required network fields (name, type, visibility).' });
     }
-
+    
     const allowedTypes = ['Professional', 'Social', 'Interest-Based'];
     if (!allowedTypes.includes(type)) {
         return res.status(400).json({ message: 'Invalid network type. Must be Professional, Social, or Interest-Based.' });
@@ -541,5 +541,166 @@ router.delete('/networks/:id', authenticateToken, checkAdmin, async (req, res) =
         res.status(500).json({ message: 'Server error deleting network.' });
     }
 });
+
+
+// --- Admin Resource Management Routes (NEW) ---
+
+router.post('/resources', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/resources POST endpoint.");
+    const { title, description, type, url, accessLevel, networkIds, content } = req.body; // Added 'content' to destructuring
+
+    if (!title || !type || !accessLevel) {
+        return res.status(400).json({ message: 'Missing required resource fields (title, type, accessLevel).' });
+    }
+    
+    const allowedTypes = ['Document', 'Link', 'Download', 'Contact Info', 'Content Template']; // Added 'Content Template' type
+    if (!allowedTypes.includes(type)) {
+        return res.status(400).json({ message: 'Invalid resource type.' });
+    }
+
+    const allowedAccessLevels = ['All Members', 'Specific Networks', 'Admin Only'];
+    if (!allowedAccessLevels.includes(accessLevel)) {
+        return res.status(400).json({ message: 'Invalid accessLevel. Must be All Members, Specific Networks, or Admin Only.' });
+    }
+
+    if (accessLevel === 'Specific Networks' && (!networkIds || !Array.isArray(networkIds) || !networkIds.every(id => typeof id === 'string'))) {
+        return res.status(400).json({ message: 'networkIds must be an array of strings if accessLevel is Specific Networks.' });
+    }
+
+    try {
+        const newResource = {
+            title,
+            description: description || null,
+            type,
+            url: url || null,
+            content: content || null, // Added content field
+            accessLevel,
+            networkIds: (accessLevel === 'Specific Networks' && networkIds) ? networkIds : [],
+            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
+            updatedAt: adminApp.firestore.FieldValue.serverTimestamp(),
+            createdBy: req.user.id
+        };
+
+        const docRef = await db.collection('resources').add(newResource);
+        res.status(201).json({ message: 'Resource created successfully.', id: docRef.id });
+
+    } catch (error) {
+        console.error('Error creating resource:', error); // String literal closed
+        res.status(500).json({ message: error.message || 'Server error creating resource.' });
+    }
+});
+
+router.get('/resources', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/resources GET endpoint.");
+    const { type, accessLevel } = req.query; // Optional filters
+
+    try {
+        let query = db.collection('resources');
+
+        if (type) {
+            query = query.where('type', '==', type);
+        }
+        if (accessLevel) {
+            query = query.where('accessLevel', '==', accessLevel);
+        }
+
+        const snapshot = await query.orderBy('title', 'asc').get();
+        const resources = [];
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            resources.push({
+                id: doc.id,
+                ...data,
+                createdAt: data.createdAt?.toDate().toISOString() || null,
+                updatedAt: data.updatedAt?.toDate().toISOString() || null,
+            });
+        });
+
+        res.status(200).json({ message: 'Resources retrieved successfully.', resources });
+
+    } catch (error) {
+        console.error('Error retrieving resources:', error); // String literal closed
+        res.status(500).json({ message: 'Server error retrieving resources.' });
+    }
+});
+
+router.get('/resources/:id', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/resources/:id GET endpoint.");
+    const resourceId = req.params.id;
+
+    try {
+        const doc = await db.collection('resources').doc(resourceId).get();
+
+        if (!doc.exists) {
+            return res.status(404).json({ message: 'Resource not found.' });
+        }
+
+        const data = doc.data();
+        const resource = {
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate().toISOString() || null,
+            updatedAt: data.updatedAt?.toDate().toISOString() || null,
+        };
+
+        res.status(200).json({ message: 'Resource retrieved successfully.', resource });
+
+    } catch (error) {
+        console.error('Error retrieving resource by ID:', error); // String literal closed
+        res.status(500).json({ message: 'Server error retrieving resource.' });
+    }
+});
+
+router.put('/resources/:id', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/resources/:id PUT endpoint.");
+    const resourceId = req.params.id;
+    const updates = req.body;
+
+    try {
+        const resourceRef = db.collection('resources').doc(resourceId);
+        const resourceDoc = await resourceRef.get();
+
+        if (!resourceDoc.exists) {
+            return res.status(404).json({ message: 'Resource not found.' });
+        }
+
+        const allowedTypes = ['Document', 'Link', 'Download', 'Contact Info', 'Content Template']; // Added 'Content Template'
+        if (updates.type !== undefined && !allowedTypes.includes(updates.type)) {
+            return res.status(400).json({ message: 'Invalid resource type.' });
+        }
+
+        const allowedAccessLevels = ['All Members', 'Specific Networks', 'Admin Only'];
+        if (updates.accessLevel !== undefined && !allowedAccessLevels.includes(updates.accessLevel)) {
+            return res.status(400).json({ message: 'Invalid accessLevel. Must be All Members, Specific Networks, or Admin Only.' });
+        }
+
+        if (updates.accessLevel === 'Specific Networks' && (updates.networkIds === undefined || !Array.isArray(updates.networkIds) || !updates.networkIds.every(id => typeof id === 'string'))) {
+            return res.status(400).json({ message: 'networkIds must be an array of strings if accessLevel is Specific Networks.' });
+        }
+
+        updates.updatedAt = adminApp.firestore.FieldValue.serverTimestamp();
+
+        await resourceRef.update(updates);
+        res.status(200).json({ message: 'Resource updated successfully.' });
+
+    } catch (error) {
+        console.error('Error updating resource:', error); // String literal closed
+        res.status(500).json({ message: error.message || 'Server error updating resource.' });
+    }
+});
+
+router.delete('/resources/:id', authenticateToken, checkAdmin, async (req, res) => {
+    console.log("[DEBUG] API call received at /admin/resources/:id DELETE endpoint.");
+    const resourceId = req.params.id;
+
+    try {
+        await db.collection('resources').doc(resourceId).delete();
+        res.status(200).json({ message: 'Resource deleted successfully.' });
+    } catch (error) {
+        console.error('Error deleting resource:', error); // String literal closed
+        res.status(500).json({ message: 'Server error deleting resource.' });
+    }
+});
+
 
 export default router;
