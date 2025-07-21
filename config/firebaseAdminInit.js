@@ -1,15 +1,13 @@
 // File: config/firebaseAdminInit.js - Final Review: OK
 
 import admin from 'firebase-admin';
-import { Storage } from '@google-cloud/storage'; 
+import { Storage } from '@google-cloud/storage';
 
-const serviceAccountJsonString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON; 
-
+const serviceAccountJsonString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
 let initializedAuth;
 let initializedDb;
-let initializedStorage; 
-
+let initializedStorage;
 
 if (!admin.apps.length) {
   if (!serviceAccountJsonString) {
@@ -18,23 +16,23 @@ if (!admin.apps.length) {
   }
 
   try {
-    const serviceAccount = JSON.parse(serviceAccountJsonString); 
+    const serviceAccount = JSON.parse(serviceAccountJsonString);
 
     const app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      databaseURL: process.env.FIREBASE_DATABASE_URL, 
+      databaseURL: process.env.FIREBASE_DATABASE_URL,
     });
     console.log("Firebase Admin SDK initialized successfully.");
 
     initializedAuth = app.auth();
     initializedDb = app.firestore();
     initializedStorage = new Storage({
-      projectId: serviceAccount.project_id, 
+      projectId: serviceAccount.project_id,
       credentials: {
         client_email: serviceAccount.client_email,
-        private_key: serviceAccount.private_key, 
+        private_key: serviceAccount.private_key,
       }
-    }).bucket(`${serviceAccount.project_id}.appspot.com`); 
+    }).bucket(`${serviceAccount.project_id}.appspot.com`);
     console.log("Firebase Storage initialized successfully.");
 
   } catch (error) {
@@ -49,15 +47,15 @@ if (!admin.apps.length) {
   initializedDb = app.firestore();
   const serviceAccount = JSON.parse(serviceAccountJsonString);
   initializedStorage = new Storage({
-      projectId: serviceAccount.project_id,
-      credentials: {
-        client_email: serviceAccount.client_email,
-        private_key: serviceAccount.private_key,
-      }
-    }).bucket(`${serviceAccount.project_id}.appspot.com`);
+    projectId: serviceAccount.project_id,
+    credentials: {
+      client_email: serviceAccount.client_email,
+      private_key: serviceAccount.private_key,
+    }
+  }).bucket(`${serviceAccount.project_id}.appspot.com`);
 }
 
-export const adminApp = admin; 
+export const adminApp = admin;
 export const auth = initializedAuth;
 export const db = initializedDb;
 export const bucket = initializedStorage;
