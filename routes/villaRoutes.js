@@ -19,7 +19,6 @@ const formatBookingData = (data, isAdmin = false) => {
         updatedAt: data.updatedAt?.toDate().toISOString() || null,
     };
 
-    // If the user is not an admin, remove sensitive fields
     if (!isAdmin) {
         delete formattedData.price;
         delete formattedData.propertyContactInfo;
@@ -39,7 +38,7 @@ adminRouter.get('/', async (req, res) => {
         const snapshot = await db.collection('villaBookings').orderBy('checkIn', 'desc').get();
         const bookings = snapshot.docs.map(doc => ({
             id: doc.id,
-            ...formatBookingData(doc.data(), true) // is admin
+            ...formatBookingData(doc.data(), true)
         }));
         res.status(200).json({ message: 'All bookings retrieved successfully.', bookings });
     } catch (error) {
@@ -58,7 +57,7 @@ adminRouter.get('/:bookingId', async (req, res) => {
         }
         res.status(200).json({
             message: 'Booking retrieved successfully.',
-            booking: { id: doc.id, ...formatBookingData(doc.data(), true) } // is admin
+            booking: { id: doc.id, ...formatBookingData(doc.data(), true) }
         });
     } catch (error) {
         console.error('Admin error getting booking by ID:', error);
@@ -129,7 +128,15 @@ adminRouter.put('/:bookingId', async (req, res) => {
 // DELETE a booking (for admins)
 adminRouter.delete('/:bookingId', async (req, res) => {
     try {
-        const bookingRef = db.collection('villaBookings').doc(req.params.bookingId);
+        const { bookingId } = req.params;
+        const bookingRef = db.collection('villaBookings').doc(bookingId);
+        
+        // Improvement: Check if the document exists before trying to delete
+        const doc = await bookingRef.get();
+        if (!doc.exists) {
+            return res.status(404).json({ message: 'Booking not found.' });
+        }
+
         await bookingRef.delete();
         res.status(200).json({ message: 'Booking deleted successfully.' });
     } catch (error) {
@@ -154,7 +161,7 @@ memberRouter.get('/my-bookings', async (req, res) => {
             
         const bookings = snapshot.docs.map(doc => ({
             id: doc.id,
-            ...formatBookingData(doc.data(), false) // is NOT admin
+            ...formatBookingData(doc.data(), false)
         }));
         res.status(200).json({ message: 'Your bookings retrieved successfully.', bookings });
     } catch (error) {
@@ -164,7 +171,6 @@ memberRouter.get('/my-bookings', async (req, res) => {
 });
 
 // --- Main Router ---
-// Mount the admin and member routers with appropriate base paths
 router.use('/admin', adminRouter);
 router.use('/', memberRouter);
 
