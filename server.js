@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Import Firebase Admin SDK initialization
-// This will automatically initialize Firebase and export the necessary instances
 import { db, auth, bucket } from './config/firebaseAdminInit.js';
 
 // Import routes
@@ -15,8 +14,7 @@ import memberRoutes from './routes/memberRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import villaRoutes from './routes/villaRoutes.js';
-// Note: Offer, Referral, and Security routes were not fully implemented.
-// If needed, they can be built out following the pattern of the other route files.
+import referralRoutes from './routes/referralRoutes.js'; // <-- ADDED
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -32,13 +30,11 @@ const allowedOrigins = [
 
 const corsOptions = {
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin) return callback(null, true);
-        if (allowedOrigins.indexOf(origin) === -1) {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-            return callback(new Error(msg), false);
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
         }
-        return callback(null, true);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -46,16 +42,11 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-// Handle preflight requests across all routes
 app.options('*', cors(corsOptions));
-
-// Body parser middleware
 app.use(express.json());
 
 // --- API Routes ---
 
-// Main welcome route
 app.get('/', (req, res) => {
     res.status(200).json({
         message: "YOH Underground Server is operational.",
@@ -70,6 +61,7 @@ app.use('/api/member', memberRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/villas', villaRoutes);
+app.use('/api/referrals', referralRoutes); // <-- ADDED
 
 // --- Error Handling ---
 app.use((err, req, res, next) => {
@@ -79,14 +71,10 @@ app.use((err, req, res, next) => {
 
 
 // --- Server Initialization ---
-
-// This check ensures we only start the listener when running locally
-// Vercel handles the server lifecycle automatically
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
         console.log(`Server is running locally on http://localhost:${PORT}`);
     });
 }
 
-// Export the app instance for Vercel
 export default app;
