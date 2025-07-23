@@ -15,8 +15,10 @@ import memberRoutes from './routes/memberRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
 import villaRoutes from './routes/villaRoutes.js';
 import referralRoutes from './routes/referralRoutes.js';
+import offerRoutes from './routes/offerRoutes.js';
+import securityRoutes from './routes/securityRoutes.js'; // <-- ADDED
 
-// Admin-Specific Routes (Refactored)
+// Admin-Specific Routes
 import adminUserRoutes from './routes/userRoutes.js';
 import adminItineraryRoutes from './routes/itineraryRoutes.js';
 import adminChatRoutes from './routes/chatRoutes.js';
@@ -63,6 +65,7 @@ app.use('/api/member', memberRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/villas', villaRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/offers', offerRoutes);
 
 // Mount the refactored admin routes
 app.use('/api/admin/users', adminUserRoutes);
@@ -70,6 +73,7 @@ app.use('/api/admin/itineraries', adminItineraryRoutes);
 app.use('/api/admin/chats', adminChatRoutes);
 app.use('/api/admin/networks', adminNetworkRoutes);
 app.use('/api/admin/resources', adminResourceRoutes);
+app.use('/api/admin/security', securityRoutes); // <-- ADDED
 
 
 // --- Error Handling ---
