@@ -1,4 +1,3 @@
-
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -9,6 +8,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Firebase Admin SDK initialization
 try {
   const encodedServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
 
@@ -18,16 +18,27 @@ try {
 
   const serviceAccount = JSON.parse(Buffer.from(encodedServiceAccount, 'base64').toString('utf8'));
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-  console.log("Firebase Admin SDK initialized successfully.");
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log("Firebase Admin SDK initialized successfully.");
+  }
 } catch (error) {
   console.error("Error initializing Firebase Admin SDK:", error.message);
   console.log("Please ensure you have a valid FIREBASE_SERVICE_ACCOUNT (Base64 encoded) environment variable in Render.");
 }
 
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+  origin: 'http://www.yohunderground.fun',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
+
 app.use(express.json());
 
 // Main welcome route
