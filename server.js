@@ -1,59 +1,88 @@
-import { Router } from 'express';
-import { db, adminApp } from '../config/firebaseAdminInit.js';
-import { authenticateToken, checkAdmin } from '../middleware/authMiddleware.js';
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
 
-const router = Router();
+// Load environment variables
+dotenv.config();
 
-// All routes in this file are for admins and require authentication.
-router.use(authenticateToken, checkAdmin);
+// Import Firebase Admin SDK initialization
+import { db, auth, bucket } from './config/firebaseAdminInit.js';
 
-// Utility to format timestamps
-const formatTimestamps = (data) => {
-    const formatted = { ...data };
-    for (const key in formatted) {
-        if (formatted[key] && typeof formatted[key].toDate === 'function') {
-            formatted[key] = formatted[key].toDate().toISOString();
+// --- Import Routes ---
+// Core Routes
+import authRoutes from './routes/authRoutes.js';
+import memberRoutes from './routes/memberRoutes.js';
+import eventRoutes from './routes/eventRoutes.js';
+import villaRoutes from './routes/villaRoutes.js';
+import referralRoutes from './routes/referralRoutes.js';
+
+// Admin-Specific Routes (Refactored)
+import adminUserRoutes from './routes/userRoutes.js';
+import adminItineraryRoutes from './routes/itineraryRoutes.js';
+import adminChatRoutes from './routes/chatRoutes.js';
+import adminNetworkRoutes from './routes/networkRoutes.js';
+import adminResourceRoutes from './routes/resourceRoutes.js';
+
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// --- Middleware ---
+app.use(cors({
+    origin: (origin, callback) => {
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'http://www.yohunderground.fun',
+            'https://www.yohunderground.fun'
+        ];
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
         }
-    }
-    return formatted;
-};
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
+app.options('*', cors());
+app.use(express.json());
 
-// GET all users
-router.get('/', async (req, res) => {
-    try {
-        const snapshot = await db.collection('users').orderBy('name').get();
-        const users = snapshot.docs.map(doc => {
-            const { password, accessCode, ...userData } = doc.data();
-            return { id: doc.id, ...formatTimestamps(userData) };
-        });
-        res.status(200).json({ message: 'Users retrieved successfully.', users });
-    } catch (error) {
-        console.error('Error getting users:', error);
-        res.status(500).json({ message: 'Server error retrieving users.' });
-    }
+// --- API Routes ---
+app.get('/', (req, res) => {
+    res.status(200).json({
+        message: "YOH Underground Server is operational.",
+        status: "OK",
+        timestamp: new Date().toISOString()
+    });
 });
 
-// PUT to update a user
-router.put('/:userId', async (req, res) => {
-    const { userId } = req.params;
-    const updates = req.body;
+// Mount core application routes
+app.use('/api/auth', authRoutes);
+app.use('/api/member', memberRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/villas', villaRoutes);
+app.use('/api/referrals', referralRoutes);
 
-    delete updates.password;
-    delete updates.accessCode;
+// Mount the refactored admin routes
+app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/admin/itineraries', adminItineraryRoutes);
+app.use('/api/admin/chats', adminChatRoutes);
+app.use('/api/admin/networks', adminNetworkRoutes);
+app.use('/api/admin/resources', adminResourceRoutes);
 
-    try {
-        const userRef = db.collection('users').doc(userId);
-        const doc = await userRef.get();
-        if (!doc.exists) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
 
-        await userRef.update({ ...updates, updatedAt: adminApp.firestore.FieldValue.serverTimestamp() });
-        res.status(200).json({ message: 'User updated successfully.' });
-    } catch (error) {
-        console.error('Error updating user:', error);
-        res.status(500).json({ message: 'Server error updating user.' });
-    }
+// --- Error Handling ---
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something broke!');
 });
 
-export default router;
+// --- Server Initialization ---
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server is running locally on http://localhost:${PORT}`);
+    });
+}
+
+export default app;
