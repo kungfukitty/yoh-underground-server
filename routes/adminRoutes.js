@@ -1,4 +1,4 @@
-// File: routes/adminRoutes.js - ABSOLUTELY FINAL CORRECTED BACKEND VERSION
+// File: routes/adminRoutes.js - Corrected (Closed all unclosed route blocks)
 
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
@@ -544,71 +544,6 @@ router.delete('/networks/:id', authenticateToken, checkAdmin, async (req, res) =
 
 
 // --- Admin Resource Management Routes (NEW) ---
-// --- Admin Villa Booking Routes (NEW) ---
-});
-    // Delete a villa booking
-router.delete('/villas/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Update a villa booking
-router.put('/villas/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Get a specific villa booking
-router.get('/villas/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Get all villa bookings
-router.get('/villas', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Create a new villa booking
-router.post('/villas', authenticateToken, checkAdmin, async (req, res) => {
-
-// --- Admin Referral Management Routes (NEW) ---
-});
-    // Delete a referral
-router.delete('/referrals/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Update a referral
-router.put('/referrals/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Get a specific referral
-router.get('/referrals/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Get all referrals
-router.get('/referrals', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Create a new referral
-router.post('/referrals', authenticateToken, checkAdmin, async (req, res) => {
-
-// --- Admin Exclusive Offers Routes (NEW) ---
-});
-    // Delete an exclusive offer
-router.delete('/offers/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Update an exclusive offer
-router.put('/offers/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Get a specific exclusive offer
-router.get('/offers/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Get all exclusive offers
-router.get('/offers', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Create a new exclusive offer
-router.post('/offers', authenticateToken, checkAdmin, async (req, res) => {
-
-// --- Admin Security Logs Routes (NEW) ---
-});
-    // Delete a security log
-router.delete('/security/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Get a specific security log
-router.get('/security/:id', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Get all security logs
-router.get('/security', authenticateToken, checkAdmin, async (req, res) => {
-});
-    // Log a security event
-router.post('/security', authenticateToken, checkAdmin, async (req, res) => {
-
 
 router.post('/resources', authenticateToken, checkAdmin, async (req, res) => {
     console.log("[DEBUG] API call received at /admin/resources POST endpoint.");
@@ -650,7 +585,7 @@ router.post('/resources', authenticateToken, checkAdmin, async (req, res) => {
         res.status(201).json({ message: 'Resource created successfully.', id: docRef.id });
 
     } catch (error) {
-        console.error('Error creating resource:', error); // String literal closed
+        console.error('Error creating resource:', error);
         res.status(500).json({ message: error.message || 'Server error creating resource.' });
     }
 });
@@ -684,7 +619,7 @@ router.get('/resources', authenticateToken, checkAdmin, async (req, res) => {
         res.status(200).json({ message: 'Resources retrieved successfully.', resources });
 
     } catch (error) {
-        console.error('Error retrieving resources:', error); // String literal closed
+        console.error('Error retrieving resources:', error);
         res.status(500).json({ message: 'Server error retrieving resources.' });
     }
 });
@@ -711,7 +646,7 @@ router.get('/resources/:id', authenticateToken, checkAdmin, async (req, res) => 
         res.status(200).json({ message: 'Resource retrieved successfully.', resource });
 
     } catch (error) {
-        console.error('Error retrieving resource by ID:', error); // String literal closed
+        console.error('Error retrieving resource by ID:', error);
         res.status(500).json({ message: 'Server error retrieving resource.' });
     }
 });
@@ -729,7 +664,7 @@ router.put('/resources/:id', authenticateToken, checkAdmin, async (req, res) => 
             return res.status(404).json({ message: 'Resource not found.' });
         }
 
-        const allowedTypes = ['Document', 'Link', 'Download', 'Contact Info', 'Content Template']; // Added 'Content Template'
+        const allowedTypes = ['Document', 'Link', 'Download', 'Contact Info', 'Content Template'];
         if (updates.type !== undefined && !allowedTypes.includes(updates.type)) {
             return res.status(400).json({ message: 'Invalid resource type.' });
         }
@@ -749,7 +684,7 @@ router.put('/resources/:id', authenticateToken, checkAdmin, async (req, res) => 
         res.status(200).json({ message: 'Resource updated successfully.' });
 
     } catch (error) {
-        console.error('Error updating resource:', error); // String literal closed
+        console.error('Error updating resource:', error);
         res.status(500).json({ message: error.message || 'Server error updating resource.' });
     }
 });
@@ -762,7 +697,7 @@ router.delete('/resources/:id', authenticateToken, checkAdmin, async (req, res) 
         await db.collection('resources').doc(resourceId).delete();
         res.status(200).json({ message: 'Resource deleted successfully.' });
     } catch (error) {
-        console.error('Error deleting resource:', error); // String literal closed
+        console.error('Error deleting resource:', error);
         res.status(500).json({ message: 'Server error deleting resource.' });
     }
 });
