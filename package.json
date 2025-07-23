@@ -1,6 +1,6 @@
 {
   "name": "yoh-underground-server",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Backend server for the YOH Underground portal.",
   "main": "server.js",
   "type": "module",
@@ -15,7 +15,8 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "firebase-admin": "^12.1.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^5.0.7"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"
