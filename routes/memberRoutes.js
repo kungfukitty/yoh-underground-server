@@ -1,56 +1,31 @@
-// File: routes/memberRoutes.js - Final Review: OK
-
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
-import jwt from 'jsonwebtoken';
+import { authenticateToken, checkNdaAccepted } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
-const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; 
+// All routes in this file require a valid token, so we can apply the middleware at the router level.
+router.use(authenticateToken);
 
-    if (token == null) {
-        return res.status(401).json({ message: 'Authentication token required.' });
-    }
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) {
-            console.error("[DEBUG] JWT verification failed:", err.message);
-            return res.status(403).json({ message: 'Invalid or expired token.' });
-        }
-        req.user = user; 
-        next();
-    });
-};
-
-const checkNdaAccepted = async (req, res, next) => {
-    try {
-        const userDoc = await db.collection('users').doc(req.user.id).get();
-        if (!userDoc.exists || !userDoc.data().isNDAAccepted) {
-            return res.status(403).json({ message: 'NDA not accepted. Access denied.' });
-        }
-        next();
-    } catch (error) {
-        console.error('Error checking NDA acceptance:', error);
-        res.status(500).json({ message: 'Server error checking NDA status.' });
-    }
-};
-
-router.post('/acknowledge-nda', authenticateToken, async (req, res) => {
-    console.log("[DEBUG] API call received at /acknowledge-nda endpoint by user:", req.user.id);
-    const userId = req.user.id; 
+// Route to acknowledge the NDA
+router.post('/acknowledge-nda', async (req, res) => {
+    const userId = req.user.id;
     try {
         const userDocRef = db.collection('users').doc(userId);
         const userDoc = await userDocRef.get();
-        if (!userDoc.exists) { return res.status(404).json({ message: 'User not found.' }); }
-        const userData = userDoc.data();
-        if (userData.isNDAAccepted) { return res.status(200).json({ message: 'NDA already acknowledged.', isNDAAccepted: true }); }
+
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        if (userDoc.data().isNDAAccepted) {
+            return res.status(200).json({ message: 'NDA already acknowledged.', isNDAAccepted: true });
+        }
+
         await userDocRef.update({
             isNDAAccepted: true,
             ndaAcceptedAt: adminApp.firestore.FieldValue.serverTimestamp(),
         });
-        console.log(`[DEBUG] User ${userId} successfully acknowledged NDA.`);
+
         res.status(200).json({ message: 'NDA acknowledged successfully.', isNDAAccepted: true });
     } catch (error) {
         console.error('Error acknowledging NDA:', error);
@@ -58,34 +33,34 @@ router.post('/acknowledge-nda', authenticateToken, async (req, res) => {
     }
 });
 
-router.get('/nda-status', authenticateToken, async (req, res) => {
-    console.log("[DEBUG] API call received at /nda-status endpoint by user:", req.user.id);
+// Route to get the current user's NDA status
+router.get('/nda-status', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
-        if (!userDoc.exists) { return res.status(404).json({ message: 'User not found.' }); }
-        const isNDAAccepted = userDoc.data().isNDAAccepted || false;
-        const ndaAcceptedAt = userDoc.data().ndaAcceptedAt ? userDoc.data().ndaAcceptedAt.toDate().toISOString() : null;
-        res.status(200).json({ message: 'NDA status retrieved successfully.', isNDAAccepted: isNDAAccepted, ndaAcceptedAt: ndaAcceptedAt });
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        const userData = userDoc.data();
+        res.status(200).json({
+            isNDAAccepted: userData.isNDAAccepted || false,
+            ndaAcceptedAt: userData.ndaAcceptedAt?.toDate().toISOString() || null
+        });
     } catch (error) {
         console.error('Error retrieving NDA status:', error);
         res.status(500).json({ message: 'Server error retrieving NDA status.' });
     }
 });
 
-router.get('/profile', authenticateToken, async (req, res) => {
-    console.log("[DEBUG] API call received at /profile GET endpoint for user:", req.user.id);
+// Route to get the current user's profile
+router.get('/profile', async (req, res) => {
     const userId = req.user.id;
     try {
         const userDoc = await db.collection('users').doc(userId).get();
-        if (!userDoc.exists) { console.log(`[DEBUG] Profile not found for user ID: ${userId}`); return res.status(404).json({ message: 'User profile not found.' }); }
-        const userData = userDoc.data();
-        const { password, accessCode, ...profileData } = userData; 
-        if (profileData.ndaAcceptedAt && typeof profileData.ndaAcceptedAt.toDate === 'function') {
-            profileData.ndaAcceptedAt = profileData.ndaAcceptedAt.toDate().toISOString();
-        } else {
-            profileData.ndaAcceptedAt = null;
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: 'User profile not found.' });
         }
+        const { password, accessCode, ...profileData } = userDoc.data();
         res.status(200).json({ message: 'User profile retrieved successfully.', profile: profileData });
     } catch (error) {
         console.error('Error retrieving user profile:', error);
@@ -93,25 +68,29 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-router.put('/profile', authenticateToken, async (req, res) => {
-    console.log("[DEBUG] API call received at /profile PUT endpoint for user:", req.user.id);
+// Route to update the current user's profile
+router.put('/profile', async (req, res) => {
     const userId = req.user.id;
-    const updates = req.body; 
-    const disallowedFields = ['email', 'password', 'accessCode', 'isClaimed', 'activatedAt', 'isNDAAccepted', 'ndaAcceptedAt', 'connectionInterests', 'connectionVisibility', 'lastConnectionUpdateAt'];
-    const forbiddenUpdates = Object.keys(updates).filter(field => disallowedFields.includes(field));
+    const updates = req.body;
 
-    if (forbiddenUpdates.length > 0) {
-        return res.status(400).json({ 
-            message: `Attempted to update disallowed fields: ${forbiddenUpdates.join(', ')}. Please use dedicated routes for sensitive updates.` 
-        });
+    // Prevent users from updating protected fields via this endpoint
+    const disallowedFields = [
+        'email', 'password', 'accessCode', 'isClaimed', 'isAdmin',
+        'activatedAt', 'isNDAAccepted', 'ndaAcceptedAt'
+    ];
+    for (const field of disallowedFields) {
+        if (updates.hasOwnProperty(field)) {
+            delete updates[field];
+        }
+    }
+
+    if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: 'No valid fields provided for update.' });
     }
 
     try {
         const userDocRef = db.collection('users').doc(userId);
-        const userDoc = await userDocRef.get();
-        if (!userDoc.exists) { console.log(`[DEBUG] Profile not found for user ID: ${userId}`); return res.status(404).json({ message: 'User profile not found.' }); }
         await userDocRef.update(updates);
-        console.log(`[DEBUG] User ${userId} profile updated successfully.`);
         res.status(200).json({ message: 'User profile updated successfully.' });
     } catch (error) {
         console.error('Error updating user profile:', error);
@@ -119,47 +98,44 @@ router.put('/profile', authenticateToken, async (req, res) => {
     }
 });
 
-router.put('/connection-preferences', authenticateToken, checkNdaAccepted, async (req, res) => {
-    console.log("[DEBUG] API call received at /connection-preferences PUT endpoint by user:", req.user.id);
+// --- Routes requiring NDA acceptance ---
+router.use(checkNdaAccepted);
+
+// Route to update connection preferences
+router.put('/connection-preferences', async (req, res) => {
     const userId = req.user.id;
     const { connectionInterests, connectionVisibility } = req.body;
 
-    if (connectionInterests !== undefined && (!Array.isArray(connectionInterests) || !connectionInterests.every(i => typeof i === 'string'))) {
-        return res.status(400).json({ message: 'connectionInterests must be an array of strings.' });
+    const updates = { lastConnectionUpdateAt: adminApp.firestore.FieldValue.serverTimestamp() };
+
+    if (connectionInterests !== undefined) {
+        if (!Array.isArray(connectionInterests) || !connectionInterests.every(i => typeof i === 'string')) {
+            return res.status(400).json({ message: 'connectionInterests must be an array of strings.' });
+        }
+        updates.connectionInterests = connectionInterests;
     }
 
-    const allowedVisibilities = ['Visible to all members', 'Visible to members with shared interests', 'Not visible for connections'];
-    if (connectionVisibility !== undefined && !allowedVisibilities.includes(connectionVisibility)) {
-        return res.status(400).json({ message: 'Invalid connectionVisibility value.' });
+    if (connectionVisibility !== undefined) {
+        const allowedVisibilities = ['Visible to all members', 'Visible to members with shared interests', 'Not visible for connections'];
+        if (!allowedVisibilities.includes(connectionVisibility)) {
+            return res.status(400).json({ message: 'Invalid connectionVisibility value.' });
+        }
+        updates.connectionVisibility = connectionVisibility;
     }
 
     try {
         const userDocRef = db.collection('users').doc(userId);
-        const updates = { 
-            lastConnectionUpdateAt: adminApp.firestore.FieldValue.serverTimestamp(),
-        };
-
-        if (connectionInterests !== undefined) {
-            updates.connectionInterests = connectionInterests;
-        }
-        if (connectionVisibility !== undefined) {
-            updates.connectionVisibility = connectionVisibility;
-        }
-        
         await userDocRef.update(updates);
-
         res.status(200).json({ message: 'Connection preferences updated successfully.' });
-
     } catch (error) {
         console.error('Error updating connection preferences:', error);
         res.status(500).json({ message: 'Server error updating connection preferences.' });
     }
 });
 
-router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) => {
-    console.log("[DEBUG] API call received at /discover GET endpoint by user:", req.user.id);
+// Route to discover other members
+router.get('/discover', async (req, res) => {
     const currentUserId = req.user.id;
-
     try {
         const currentUserDoc = await db.collection('users').doc(currentUserId).get();
         if (!currentUserDoc.exists) {
@@ -168,57 +144,46 @@ router.get('/discover', authenticateToken, checkNdaAccepted, async (req, res) =>
         const currentUserData = currentUserDoc.data();
         const currentUserInterests = currentUserData.connectionInterests || [];
 
-        const membersRef = db.collection('users');
-        let query = membersRef;
-
-        const snapshot = await query.get();
+        const snapshot = await db.collection('users').where('isNDAAccepted', '==', true).get();
         const discoverableMembers = [];
 
         snapshot.forEach(doc => {
-            const memberId = doc.id;
+            if (doc.id === currentUserId) return; // Skip self
+
             const memberData = doc.data();
+            let canBeDiscovered = false;
 
-            if (memberId === currentUserId) {
-                return;
+            switch (memberData.connectionVisibility) {
+                case 'Visible to all members':
+                    canBeDiscovered = true;
+                    break;
+                case 'Visible to members with shared interests':
+                    const memberInterests = memberData.connectionInterests || [];
+                    if (currentUserInterests.some(interest => memberInterests.includes(interest))) {
+                        canBeDiscovered = true;
+                    }
+                    break;
+                // Default is 'Not visible for connections', so no action needed
             }
 
-            if (memberData.connectionVisibility === 'Not visible for connections') {
-                return;
+            if (canBeDiscovered) {
+                discoverableMembers.push({
+                    id: doc.id,
+                    name: memberData.name || 'N/A',
+                    status: memberData.status || 'N/A',
+                    connectionInterests: memberData.connectionInterests || [],
+                });
             }
-
-            if (!memberData.isNDAAccepted) {
-                return;
-            }
-
-            if (memberData.connectionVisibility === 'Visible to members with shared interests') {
-                const memberInterests = memberData.connectionInterests || [];
-                const hasSharedInterest = currentUserInterests.some(interest => memberInterests.includes(interest));
-                if (!hasSharedInterest) {
-                    return;
-                }
-            }
-
-            const { password, accessCode, isClaimed, activatedAt, isNDAAccepted, ndaAcceptedAt, email, ...discoverableProfile } = memberData;
-
-            discoverableMembers.push({
-                id: memberId,
-                name: discoverableProfile.name || 'N/A',
-                status: discoverableProfile.status || 'N/A',
-                connectionInterests: discoverableProfile.connectionInterests || [],
-                connectionVisibility: discoverableProfile.connectionVisibility || 'Not visible for connections',
-            });
         });
 
         res.status(200).json({
             message: 'Discoverable members retrieved successfully.',
             members: discoverableMembers
         });
-
     } catch (error) {
         console.error('Error discovering members:', error);
         res.status(500).json({ message: 'Server error discovering members.' });
     }
 });
-
 
 export default router;
