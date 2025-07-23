@@ -8,17 +8,17 @@ dotenv.config();
 const encodedServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
 
 if (!encodedServiceAccount) {
-  throw new Error("FIREBASE_SERVICE_ACCOUNT is not set.");
+throw new Error("FIREBASE_SERVICE_ACCOUNT is not set.");
 }
 
 const serviceAccount = JSON.parse(
-  Buffer.from(encodedServiceAccount, 'base64').toString('utf8')
+Buffer.from(encodedServiceAccount, 'base64').toString('utf8')
 );
 
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+admin.initializeApp({
+credential: admin.credential.cert(serviceAccount),
+});
 }
 
 const db = admin.firestore();
