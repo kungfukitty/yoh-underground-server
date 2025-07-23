@@ -6,6 +6,8 @@ import securityRoutes from './routes/securityRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+console.log('Registering /api/member routes');
+app.use('/api/member', memberRoutes);
 
 app.use(cors());
 app.use(express.json());
