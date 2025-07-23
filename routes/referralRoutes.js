@@ -9,7 +9,6 @@ const router = Router();
 const generateCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 8);
 
 // === Member-Facing Routes ===
-// All routes here require a member to be logged in.
 router.use(authenticateToken);
 
 // POST /api/referrals/invite
@@ -26,16 +25,13 @@ router.post('/invite', async (req, res) => {
     const referralsRef = db.collection('referrals');
 
     try {
-        // 1. Check if the referred email already exists as a member
         const existingUserSnapshot = await usersRef.where('email', '==', referredEmail).limit(1).get();
         if (!existingUserSnapshot.empty) {
             return res.status(409).json({ message: 'This person is already a member or has been invited.' });
         }
 
-        // 2. Generate a unique access code for the new candidate
         const accessCode = generateCode();
 
-        // 3. Create a new user document for the referred candidate
         const newUserRef = await usersRef.add({
             name: referredName,
             email: referredEmail,
@@ -43,16 +39,15 @@ router.post('/invite', async (req, res) => {
             isClaimed: false,
             isNDAAccepted: false,
             createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            referredBy: referrerId, // Track who referred them
+            referredBy: referrerId,
         });
 
-        // 4. Create a new referral document to track the event
         const referralRef = await referralsRef.add({
             referrerId: referrerId,
-            referredUserId: newUserRef.id, // Link to the new user document
+            referredUserId: newUserRef.id,
             referredName: referredName,
             referredEmail: referredEmail,
-            status: 'Invited', // Initial status
+            status: 'Invited', // This is the first stage of the vetting process
             rewardStatus: 'Pending',
             createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
             updatedAt: adminApp.firestore.FieldValue.serverTimestamp(),
@@ -61,7 +56,7 @@ router.post('/invite', async (req, res) => {
         res.status(201).json({
             message: 'Invitation sent successfully.',
             referralId: referralRef.id,
-            accessCode: accessCode // Return the code for the member to share
+            accessCode: accessCode
         });
 
     } catch (error) {
@@ -109,15 +104,23 @@ adminRouter.get('/', async (req, res) => {
 });
 
 // PUT /api/referrals/admin/:referralId/status
-// Admin updates the status of a referral (e.g., to 'Approved' or 'Rejected').
+// Admin updates the status of a referral, which doubles as the onboarding tracker.
 adminRouter.put('/:referralId/status', async (req, res) => {
     const { referralId } = req.params;
     const { status } = req.body;
     const adminId = req.user.id;
 
-    const allowedStatuses = ['Invited', 'Signed Up', 'Applied', 'Approved', 'Rejected'];
+    // --- UPDATED: Includes all vetting stages ---
+    const allowedStatuses = [
+        'Invited',
+        'Application Submitted',
+        'Under Review',
+        'Interview Scheduled',
+        'Approved',
+        'Rejected'
+    ];
     if (!status || !allowedStatuses.includes(status)) {
-        return res.status(400).json({ message: 'A valid status is required.' });
+        return res.status(400).json({ message: 'A valid status from the vetting process is required.' });
     }
 
     const referralRef = db.collection('referrals').doc(referralId);
@@ -128,26 +131,22 @@ adminRouter.put('/:referralId/status', async (req, res) => {
             return res.status(404).json({ message: 'Referral not found.' });
         }
 
-        // Update the referral status
         await referralRef.update({
             status: status,
             updatedAt: adminApp.firestore.FieldValue.serverTimestamp()
         });
         
-        // Log this admin action in a subcollection for auditing
         await referralRef.collection('adminActions').add({
             adminId: adminId,
             action: `Changed status to ${status}`,
             timestamp: adminApp.firestore.FieldValue.serverTimestamp()
         });
 
-        // If approved, you might trigger reward creation here
         if (status === 'Approved') {
             // TODO: Implement reward creation logic
-            // e.g., create documents in a 'rewards' collection
         }
 
-        res.status(200).json({ message: `Referral status updated to ${status}.` });
+        res.status(200).json({ message: `Onboarding status updated to ${status}.` });
 
     } catch (error) {
         console.error('Admin error updating referral status:', error);
@@ -155,8 +154,6 @@ adminRouter.put('/:referralId/status', async (req, res) => {
     }
 });
 
-// Mount the admin router under a specific path
 router.use('/admin', adminRouter);
-
 
 export default router;
