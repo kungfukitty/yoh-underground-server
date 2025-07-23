@@ -31,13 +31,14 @@ try {
 
 // CORS configuration
 const corsOptions = {
-  origin: 'http://www.yohunderground.fun',
+  origin: ['http://www.yohunderground.fun', 'https://www.yohunderground.fun'],
   methods: ['GET', 'POST', 'OPTIONS'],
   credentials: true
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle preflight requests
+app.options('*', cors(corsOptions)); // Handle preflight requests)
+
 
 app.use(express.json());
 
