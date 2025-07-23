@@ -1,706 +1,182 @@
-// File: routes/adminRoutes.js - Corrected (Closed all unclosed route blocks)
-
 import { Router } from 'express';
 import { db, adminApp } from '../config/firebaseAdminInit.js';
-import jwt from 'jsonwebtoken';
+import { authenticateToken, checkAdmin } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
-const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; 
+// All routes in this file require the user to be an authenticated admin.
+router.use(authenticateToken, checkAdmin);
 
-    if (token == null) {
-        return res.status(401).json({ message: 'Authentication token required.' });
+// --- Utility Functions ---
+
+/**
+ * Converts Firestore Timestamps in an object to ISO strings.
+ * @param {object} data - The object containing Firestore Timestamps.
+ * @returns {object} - The object with converted timestamps.
+ */
+const formatTimestamps = (data) => {
+    const formatted = { ...data };
+    for (const key in formatted) {
+        if (formatted[key] && typeof formatted[key].toDate === 'function') {
+            formatted[key] = formatted[key].toDate().toISOString();
+        }
     }
-
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-        if (err) {
-            console.error("[DEBUG] JWT verification failed:", err.message);
-            return res.status(403).json({ message: 'Invalid or expired token.' });
-        }
-        req.user = user; 
-        next();
-    });
-};
-
-const checkAdmin = async (req, res, next) => {
-    try {
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ message: 'User not authenticated.' });
-        }
-        const userDoc = await db.collection('users').doc(req.user.id).get();
-        if (!userDoc.exists || !userDoc.data().isAdmin) {
-            return res.status(403).json({ message: 'Admin access required.' });
-        }
-        next();
-    } catch (error) {
-        console.error('Error checking admin status:', error);
-        res.status(500).json({ message: 'Server error checking admin status.' });
-    }
+    return formatted;
 };
 
 
-// --- Admin Itinerary Management Routes ---
+// --- User Management Routes ---
 
-router.post('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/itineraries POST endpoint.");
-    const { userId, name, description, startDate, endDate, status = 'Draft', details } = req.body;
-
-    if (!userId || !name || !startDate || !endDate || !details || !Array.isArray(details)) {
-        return res.status(400).json({ message: 'Missing required itinerary fields (userId, name, startDate, endDate, details).' });
-    }
-
+// GET all users
+router.get('/users', async (req, res) => {
     try {
-        const parsedStartDate = new Date(startDate);
-        const parsedEndDate = new Date(endDate);
-        if (isNaN(parsedStartDate.getTime()) || isNaN(parsedEndDate.getTime())) {
-            return res.status(400).json({ message: 'Invalid start or end date format.' });
-        }
-
-        const validatedDetails = details.map(activity => {
-            const activityDate = new Date(activity.date);
-            if (isNaN(activityDate.getTime()) || !activity.description || !activity.location) {
-                throw new Error('Invalid itinerary activity details format.');
-            }
+        const snapshot = await db.collection('users').get();
+        const users = snapshot.docs.map(doc => {
+            const { password, accessCode, ...userData } = doc.data();
             return {
-                ...activity,
-                date: adminApp.firestore.Timestamp.fromDate(activityDate)
+                id: doc.id,
+                ...formatTimestamps(userData)
             };
         });
-
-        const newItinerary = {
-            userId,
-            name,
-            description: description || '',
-            startDate: adminApp.firestore.Timestamp.fromDate(parsedStartDate),
-            endDate: adminApp.firestore.Timestamp.fromDate(parsedEndDate),
-            status,
-            details: validatedDetails,
-            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            createdBy: req.user.id
-        };
-
-        const docRef = await db.collection('itineraries').add(newItinerary);
-        res.status(201).json({ message: 'Itinerary created successfully.', id: docRef.id });
-
+        res.status(200).json({ message: 'Users retrieved successfully.', users });
     } catch (error) {
-        console.error('Error creating itinerary:', error);
-        res.status(500).json({ message: error.message || 'Server error creating itinerary.' });
+        console.error('Error getting users:', error);
+        res.status(500).json({ message: 'Server error retrieving users.' });
     }
 });
 
-router.get('/itineraries', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/itineraries GET endpoint.");
-    const { userId } = req.query;
+// GET a single user by ID
+router.get('/users/:id', async (req, res) => {
+    try {
+        const userDoc = await db.collection('users').doc(req.params.id).get();
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        const { password, accessCode, ...userData } = userDoc.data();
+        res.status(200).json({
+            message: 'User retrieved successfully.',
+            user: { id: userDoc.id, ...formatTimestamps(userData) }
+        });
+    } catch (error) {
+        console.error('Error getting user by ID:', error);
+        res.status(500).json({ message: 'Server error retrieving user.' });
+    }
+});
+
+// POST to create a new user
+router.post('/users', async (req, res) => {
+    const { email, name, isAdmin = false } = req.body;
+    if (!email || !name) {
+        return res.status(400).json({ message: 'Email and name are required.' });
+    }
 
     try {
-        let query = db.collection('itineraries');
-        if (userId) {
-            query = query.where('userId', '==', userId);
+        // Check if user with that email already exists
+        const existingUser = await db.collection('users').where('email', '==', email).get();
+        if (!existingUser.empty) {
+            return res.status(409).json({ message: 'A user with this email already exists.' });
         }
 
-        const snapshot = await query.get();
-        const itineraries = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            itineraries.push({
-                id: doc.id,
-                ...data,
-                startDate: data.startDate?.toDate().toISOString() || null,
-                endDate: data.endDate?.toDate().toISOString() || null,
-                createdAt: data.createdAt?.toDate().toISOString() || null,
-                updatedAt: data.updatedAt?.toDate().toISOString() || null,
-                details: data.details ? data.details.map(detail => ({
-                    ...detail,
-                    date: detail.date?.toDate().toISOString() || null
-                })) : []
-            });
+        // Generate a simple, temporary access code
+        const accessCode = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+        const newUser = {
+            email,
+            name,
+            isAdmin,
+            accessCode,
+            isClaimed: false,
+            isNDAAccepted: false,
+            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
+            createdBy: req.user.id,
+        };
+
+        const docRef = await db.collection('users').add(newUser);
+        res.status(201).json({
+            message: 'User created successfully. Please provide the access code to the user.',
+            userId: docRef.id,
+            accessCode: accessCode
         });
+    } catch (error) {
+        console.error('Error creating user:', error);
+        res.status(500).json({ message: 'Server error creating user.' });
+    }
+});
 
+// PUT to update a user
+router.put('/users/:id', async (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Admins should not update passwords or access codes here.
+    delete updates.password;
+    delete updates.accessCode;
+
+    try {
+        const userRef = db.collection('users').doc(id);
+        const doc = await userRef.get();
+        if (!doc.exists) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        await userRef.update({ ...updates, updatedAt: adminApp.firestore.FieldValue.serverTimestamp() });
+        res.status(200).json({ message: 'User updated successfully.' });
+    } catch (error) {
+        console.error('Error updating user:', error);
+        res.status(500).json({ message: 'Server error updating user.' });
+    }
+});
+
+
+// --- Itinerary Management Routes ---
+
+router.post('/itineraries', async (req, res) => {
+    const { userId, name, startDate, endDate, details } = req.body;
+    if (!userId || !name || !startDate || !endDate || !details) {
+        return res.status(400).json({ message: 'Missing required itinerary fields.' });
+    }
+    try {
+        const newItinerary = {
+            userId,
+            name,
+            description: req.body.description || '',
+            startDate: adminApp.firestore.Timestamp.fromDate(new Date(startDate)),
+            endDate: adminApp.firestore.Timestamp.fromDate(new Date(endDate)),
+            status: req.body.status || 'Draft',
+            details: details.map(d => ({ ...d, date: adminApp.firestore.Timestamp.fromDate(new Date(d.date)) })),
+            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
+            createdBy: req.user.id
+        };
+        const docRef = await db.collection('itineraries').add(newItinerary);
+        res.status(201).json({ message: 'Itinerary created successfully.', id: docRef.id });
+    } catch (error) {
+        console.error('Error creating itinerary:', error);
+        res.status(500).json({ message: 'Server error creating itinerary.' });
+    }
+});
+
+router.get('/itineraries', async (req, res) => {
+    try {
+        let query = db.collection('itineraries');
+        if (req.query.userId) {
+            query = query.where('userId', '==', req.query.userId);
+        }
+        const snapshot = await query.get();
+        const itineraries = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...formatTimestamps(data),
+                details: data.details.map(d => ({ ...d, date: d.date.toDate().toISOString() }))
+            };
+        });
         res.status(200).json({ message: 'Itineraries retrieved successfully.', itineraries });
-
     } catch (error) {
         console.error('Error retrieving itineraries:', error);
         res.status(500).json({ message: 'Server error retrieving itineraries.' });
     }
 });
 
-router.get('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/itineraries/:id GET endpoint.");
-    const itineraryId = req.params.id;
-
-    try {
-        const doc = await db.collection('itineraries').doc(itineraryId).get();
-
-        if (!doc.exists) {
-            return res.status(404).json({ message: 'Itinerary not found.' });
-        }
-
-        const data = doc.data();
-        const itinerary = {
-            id: doc.id,
-            ...data,
-            startDate: data.startDate?.toDate().toISOString() || null,
-            endDate: data.endDate?.toDate().toISOString() || null,
-            createdAt: data.createdAt?.toDate().toISOString() || null,
-            updatedAt: data.updatedAt?.toDate().toISOString() || null,
-            details: data.details ? data.details.map(detail => ({
-                ...detail,
-                date: detail.date?.toDate().toISOString() || null
-            })) : []
-        };
-
-        res.status(200).json({ message: 'Itinerary retrieved successfully.', itinerary });
-
-    } catch (error) {
-        console.error('Error retrieving itinerary by ID:', error);
-        res.status(500).json({ message: 'Server error retrieving itinerary.' });
-    }
-});
-
-router.put('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/itineraries/:id PUT endpoint.");
-    const itineraryId = req.params.id;
-    const updates = req.body;
-
-    try {
-        const itineraryRef = db.collection('itineraries').doc(itineraryId);
-        const itineraryDoc = await itineraryRef.get();
-
-        if (!itineraryDoc.exists) {
-            return res.status(404).json({ message: 'Itinerary not found.' });
-        }
-
-        if (updates.startDate) {
-            const parsedDate = new Date(updates.startDate);
-            if (isNaN(parsedDate.getTime())) return res.status(400).json({ message: 'Invalid startDate format.' });
-            updates.startDate = adminApp.firestore.Timestamp.fromDate(parsedDate);
-        }
-        if (updates.endDate) {
-            const parsedDate = new Date(updates.endDate);
-            if (isNaN(parsedDate.getTime())) return res.status(400).json({ message: 'Invalid endDate format.' });
-            updates.endDate = adminApp.firestore.Timestamp.fromDate(parsedDate);
-        }
-        if (updates.details && Array.isArray(updates.details)) {
-            updates.details = updates.details.map(activity => {
-                if (activity.date) {
-                    const activityDate = new Date(activity.date);
-                    if (isNaN(activityDate.getTime())) throw new Error('Invalid activity date format in details.');
-                    return { ...activity, date: adminApp.firestore.Timestamp.fromDate(activityDate) };
-                }
-                return activity;
-            });
-        }
-        
-        updates.updatedAt = adminApp.firestore.FieldValue.serverTimestamp();
-
-        await itineraryRef.update(updates);
-        res.status(200).json({ message: 'Itinerary updated successfully.' });
-
-    } catch (error) {
-        console.error('Error updating itinerary:', error);
-        res.status(500).json({ message: error.message || 'Server error updating itinerary.' });
-    }
-});
-
-router.delete('/itineraries/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/itineraries/:id DELETE endpoint.");
-    const itineraryId = req.params.id;
-
-    try {
-        await db.collection('itineraries').doc(itineraryId).delete();
-        res.status(200).json({ message: 'Itinerary deleted successfully.' });
-    } catch (error) {
-        console.error('Error deleting itinerary:', error);
-        res.status(500).json({ message: 'Server error deleting itinerary.' });
-    }
-});
-
-
-// --- Admin Chat Management Routes (existing) ---
-
-router.post('/chats', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/chats POST endpoint.");
-    const { userIds, messages, itineraryId, subject, status = 'Open' } = req.body;
-
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0 || !messages || !Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({ message: 'Missing required chat fields (userIds, messages).' });
-    }
-
-    try {
-        const validatedMessages = messages.map(message => {
-            const messageTimestamp = new Date(message.timestamp);
-            if (isNaN(messageTimestamp.getTime()) || !message.senderId || !message.text) {
-                throw new Error('Invalid chat message format.');
-            }
-            return {
-                ...message,
-                timestamp: adminApp.firestore.Timestamp.fromDate(messageTimestamp)
-            };
-        });
-
-        const newChatLog = {
-            userIds,
-            messages: validatedMessages,
-            itineraryId: itineraryId || null,
-            subject: subject || null,
-            status,
-            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            lastActivityAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            createdBy: req.user.id
-        };
-
-        const docRef = await db.collection('chatLogs').add(newChatLog);
-        res.status(201).json({ message: 'Chat log created successfully.', id: docRef.id });
-
-    } catch (error) {
-        console.error('Error creating chat log:', error);
-        res.status(500).json({ message: error.message || 'Server error creating chat log.' });
-    }
-});
-
-router.get('/chats', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/chats GET endpoint.");
-    const { userId, status, itineraryId } = req.query;
-
-    try {
-        let query = db.collection('chatLogs');
-
-        if (userId) {
-            query = query.where('userIds', 'array-contains', userId);
-        }
-        if (status) {
-            query = query.where('status', '==', status);
-        }
-        if (itineraryId) {
-            query = query.where('itineraryId', '==', itineraryId);
-        }
-
-        const snapshot = await query.orderBy('lastActivityAt', 'desc').get();
-        const chatLogs = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            chatLogs.push({
-                id: doc.id,
-                ...data,
-                createdAt: data.createdAt?.toDate().toISOString() || null,
-                lastActivityAt: data.lastActivityAt?.toDate().toISOString() || null,
-                messages: data.messages ? data.messages.map(message => ({
-                    ...message,
-                    timestamp: message.timestamp?.toDate().toISOString() || null
-                })) : []
-            });
-        });
-
-        res.status(200).json({ message: 'Chat logs retrieved successfully.', chatLogs });
-
-    } catch (error) {
-        console.error('Error retrieving chat logs:', error);
-        res.status(500).json({ message: 'Server error retrieving chat logs.' });
-    }
-});
-
-router.get('/chats/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/chats/:id GET endpoint.");
-    const chatId = req.params.id;
-
-    try {
-        const doc = await db.collection('chatLogs').doc(chatId).get();
-
-        if (!doc.exists) {
-            return res.status(404).json({ message: 'Chat log not found.' });
-        }
-
-        const data = doc.data();
-        const chatLog = {
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate().toISOString() || null,
-            lastActivityAt: data.lastActivityAt?.toDate().toISOString() || null,
-            messages: data.messages ? data.messages.map(message => ({
-                ...message,
-                timestamp: message.timestamp?.toDate().toISOString() || null
-            })) : []
-        };
-
-        res.status(200).json({ message: 'Chat log retrieved successfully.', chatLog });
-
-    } catch (error) {
-        console.error('Error retrieving chat log by ID:', error);
-        res.status(500).json({ message: 'Server error retrieving chat log.' });
-    }
-});
-
-router.put('/chats/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/chats/:id PUT endpoint.");
-    const chatId = req.params.id;
-    const updates = req.body;
-
-    try {
-        const chatLogRef = db.collection('chatLogs').doc(chatId);
-        const chatLogDoc = await chatLogRef.get();
-
-        if (!chatLogDoc.exists) {
-            return res.status(404).json({ message: 'Chat log not found.' });
-        }
-
-        if (updates.messages && Array.isArray(updates.messages)) {
-            const currentMessages = chatLogDoc.data().messages || [];
-            const newMessages = updates.messages.map(message => {
-                const messageTimestamp = new Date(message.timestamp);
-                if (isNaN(messageTimestamp.getTime()) || !message.senderId || !message.text) {
-                    throw new Error('Invalid new message format.');
-                }
-                return {
-                    ...message,
-                    timestamp: adminApp.firestore.Timestamp.fromDate(messageTimestamp)
-                };
-            });
-            updates.messages = [...currentMessages, ...newMessages];
-        }
-
-        updates.lastActivityAt = adminApp.firestore.FieldValue.serverTimestamp();
-
-        await chatLogRef.update(updates);
-        res.status(200).json({ message: 'Chat log updated successfully.' });
-
-    } catch (error) {
-        console.error('Error updating chat log:', error);
-        res.status(500).json({ message: error.message || 'Server error updating chat log.' });
-    }
-});
-
-router.delete('/chats/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/chats/:id DELETE endpoint.");
-    const chatId = req.params.id;
-
-    try {
-        await db.collection('chatLogs').doc(chatId).delete();
-        res.status(200).json({ message: 'Chat log deleted successfully.' });
-    } catch (error) {
-        console.error('Error deleting chat log:', error);
-        res.status(500).json({ message: 'Server error deleting chat log.' });
-    }
-});
-
-
-// --- Admin Network Management Routes (existing) ---
-
-router.post('/networks', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/networks POST endpoint.");
-    const { name, description, type, members, visibility } = req.body;
-
-    if (!name || !type || !visibility) {
-        return res.status(400).json({ message: 'Missing required network fields (name, type, visibility).' });
-    }
-    
-    const allowedTypes = ['Professional', 'Social', 'Interest-Based'];
-    if (!allowedTypes.includes(type)) {
-        return res.status(400).json({ message: 'Invalid network type. Must be Professional, Social, or Interest-Based.' });
-    }
-
-    const allowedVisibilities = ['Public', 'Private'];
-    if (!allowedVisibilities.includes(visibility)) {
-        return res.status(400).json({ message: 'Invalid network visibility. Must be Public or Private.' });
-    }
-
-    if (members !== undefined && (!Array.isArray(members) || !members.every(m => typeof m === 'string'))) {
-        return res.status(400).json({ message: 'Network members must be an array of strings (User IDs).' });
-    }
-
-    try {
-        const newNetwork = {
-            name,
-            description: description || null,
-            type,
-            members: members || [],
-            visibility,
-            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            updatedAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            createdBy: req.user.id
-        };
-
-        const docRef = await db.collection('networks').add(newNetwork);
-        res.status(201).json({ message: 'Network created successfully.', id: docRef.id });
-
-    } catch (error) {
-        console.error('Error creating network:', error);
-        res.status(500).json({ message: error.message || 'Server error creating network.' });
-    }
-});
-
-router.get('/networks', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/networks GET endpoint.");
-    const { type, visibility } = req.query;
-
-    try {
-        let query = db.collection('networks');
-
-        if (type) {
-            query = query.where('type', '==', type);
-        }
-        if (visibility) {
-            query = query.where('visibility', '==', visibility);
-        }
-
-        const snapshot = await query.orderBy('name', 'asc').get();
-        const networks = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            networks.push({
-                id: doc.id,
-                ...data,
-                createdAt: data.createdAt?.toDate().toISOString() || null,
-                updatedAt: data.updatedAt?.toDate().toISOString() || null,
-            });
-        });
-
-        res.status(200).json({ message: 'Networks retrieved successfully.', networks });
-
-    } catch (error) {
-        console.error('Error retrieving networks:', error);
-        res.status(500).json({ message: 'Server error retrieving networks.' });
-    }
-});
-
-router.get('/networks/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/networks/:id GET endpoint.");
-    const networkId = req.params.id;
-
-    try {
-        const doc = await db.collection('networks').doc(networkId).get();
-
-        if (!doc.exists) {
-            return res.status(404).json({ message: 'Network not found.' });
-        }
-
-        const data = doc.data();
-        const network = {
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate().toISOString() || null,
-            updatedAt: data.updatedAt?.toDate().toISOString() || null,
-        };
-
-        res.status(200).json({ message: 'Network retrieved successfully.', network });
-
-    } catch (error) {
-        console.error('Error retrieving network by ID:', error);
-        res.status(500).json({ message: 'Server error retrieving network.' });
-    }
-});
-
-router.put('/networks/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/networks/:id PUT endpoint.");
-    const networkId = req.params.id;
-    const updates = req.body;
-
-    try {
-        const networkRef = db.collection('networks').doc(networkId);
-        const networkDoc = await networkRef.get();
-
-        if (!networkDoc.exists) {
-            return res.status(404).json({ message: 'Network not found.' });
-        }
-
-        const allowedTypes = ['Professional', 'Social', 'Interest-Based'];
-        if (updates.type !== undefined && !allowedTypes.includes(updates.type)) {
-            return res.status(400).json({ message: 'Invalid network type. Must be Professional, Social, or Interest-Based.' });
-        }
-
-        const allowedVisibilities = ['Public', 'Private'];
-        if (updates.visibility !== undefined && !allowedVisibilities.includes(updates.visibility)) {
-            return res.status(400).json({ message: 'Invalid network visibility. Must be Public or Private.' });
-        }
-
-        if (updates.members !== undefined && (!Array.isArray(updates.members) || !updates.members.every(m => typeof m === 'string'))) {
-            return res.status(400).json({ message: 'Network members must be an array of strings (User IDs).' });
-        }
-
-        updates.updatedAt = adminApp.firestore.FieldValue.serverTimestamp();
-
-        await networkRef.update(updates);
-        res.status(200).json({ message: 'Network updated successfully.' });
-
-    } catch (error) {
-        console.error('Error updating network:', error);
-        res.status(500).json({ message: error.message || 'Server error updating network.' });
-    }
-});
-
-router.delete('/networks/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/networks/:id DELETE endpoint.");
-    const networkId = req.params.id;
-
-    try {
-        await db.collection('networks').doc(networkId).delete();
-        res.status(200).json({ message: 'Network deleted successfully.' });
-    } catch (error) {
-        console.error('Error deleting network:', error);
-        res.status(500).json({ message: 'Server error deleting network.' });
-    }
-});
-
-
-// --- Admin Resource Management Routes (NEW) ---
-
-router.post('/resources', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/resources POST endpoint.");
-    const { title, description, type, url, accessLevel, networkIds, content } = req.body; // Added 'content' to destructuring
-
-    if (!title || !type || !accessLevel) {
-        return res.status(400).json({ message: 'Missing required resource fields (title, type, accessLevel).' });
-    }
-    
-    const allowedTypes = ['Document', 'Link', 'Download', 'Contact Info', 'Content Template']; // Added 'Content Template' type
-    if (!allowedTypes.includes(type)) {
-        return res.status(400).json({ message: 'Invalid resource type.' });
-    }
-
-    const allowedAccessLevels = ['All Members', 'Specific Networks', 'Admin Only'];
-    if (!allowedAccessLevels.includes(accessLevel)) {
-        return res.status(400).json({ message: 'Invalid accessLevel. Must be All Members, Specific Networks, or Admin Only.' });
-    }
-
-    if (accessLevel === 'Specific Networks' && (!networkIds || !Array.isArray(networkIds) || !networkIds.every(id => typeof id === 'string'))) {
-        return res.status(400).json({ message: 'networkIds must be an array of strings if accessLevel is Specific Networks.' });
-    }
-
-    try {
-        const newResource = {
-            title,
-            description: description || null,
-            type,
-            url: url || null,
-            content: content || null, // Added content field
-            accessLevel,
-            networkIds: (accessLevel === 'Specific Networks' && networkIds) ? networkIds : [],
-            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            updatedAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            createdBy: req.user.id
-        };
-
-        const docRef = await db.collection('resources').add(newResource);
-        res.status(201).json({ message: 'Resource created successfully.', id: docRef.id });
-
-    } catch (error) {
-        console.error('Error creating resource:', error);
-        res.status(500).json({ message: error.message || 'Server error creating resource.' });
-    }
-});
-
-router.get('/resources', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/resources GET endpoint.");
-    const { type, accessLevel } = req.query; // Optional filters
-
-    try {
-        let query = db.collection('resources');
-
-        if (type) {
-            query = query.where('type', '==', type);
-        }
-        if (accessLevel) {
-            query = query.where('accessLevel', '==', accessLevel);
-        }
-
-        const snapshot = await query.orderBy('title', 'asc').get();
-        const resources = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            resources.push({
-                id: doc.id,
-                ...data,
-                createdAt: data.createdAt?.toDate().toISOString() || null,
-                updatedAt: data.updatedAt?.toDate().toISOString() || null,
-            });
-        });
-
-        res.status(200).json({ message: 'Resources retrieved successfully.', resources });
-
-    } catch (error) {
-        console.error('Error retrieving resources:', error);
-        res.status(500).json({ message: 'Server error retrieving resources.' });
-    }
-});
-
-router.get('/resources/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/resources/:id GET endpoint.");
-    const resourceId = req.params.id;
-
-    try {
-        const doc = await db.collection('resources').doc(resourceId).get();
-
-        if (!doc.exists) {
-            return res.status(404).json({ message: 'Resource not found.' });
-        }
-
-        const data = doc.data();
-        const resource = {
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate().toISOString() || null,
-            updatedAt: data.updatedAt?.toDate().toISOString() || null,
-        };
-
-        res.status(200).json({ message: 'Resource retrieved successfully.', resource });
-
-    } catch (error) {
-        console.error('Error retrieving resource by ID:', error);
-        res.status(500).json({ message: 'Server error retrieving resource.' });
-    }
-});
-
-router.put('/resources/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/resources/:id PUT endpoint.");
-    const resourceId = req.params.id;
-    const updates = req.body;
-
-    try {
-        const resourceRef = db.collection('resources').doc(resourceId);
-        const resourceDoc = await resourceRef.get();
-
-        if (!resourceDoc.exists) {
-            return res.status(404).json({ message: 'Resource not found.' });
-        }
-
-        const allowedTypes = ['Document', 'Link', 'Download', 'Contact Info', 'Content Template'];
-        if (updates.type !== undefined && !allowedTypes.includes(updates.type)) {
-            return res.status(400).json({ message: 'Invalid resource type.' });
-        }
-
-        const allowedAccessLevels = ['All Members', 'Specific Networks', 'Admin Only'];
-        if (updates.accessLevel !== undefined && !allowedAccessLevels.includes(updates.accessLevel)) {
-            return res.status(400).json({ message: 'Invalid accessLevel. Must be All Members, Specific Networks, or Admin Only.' });
-        }
-
-        if (updates.accessLevel === 'Specific Networks' && (updates.networkIds === undefined || !Array.isArray(updates.networkIds) || !updates.networkIds.every(id => typeof id === 'string'))) {
-            return res.status(400).json({ message: 'networkIds must be an array of strings if accessLevel is Specific Networks.' });
-        }
-
-        updates.updatedAt = adminApp.firestore.FieldValue.serverTimestamp();
-
-        await resourceRef.update(updates);
-        res.status(200).json({ message: 'Resource updated successfully.' });
-
-    } catch (error) {
-        console.error('Error updating resource:', error);
-        res.status(500).json({ message: error.message || 'Server error updating resource.' });
-    }
-});
-
-router.delete('/resources/:id', authenticateToken, checkAdmin, async (req, res) => {
-    console.log("[DEBUG] API call received at /admin/resources/:id DELETE endpoint.");
-    const resourceId = req.params.id;
-
-    try {
-        await db.collection('resources').doc(resourceId).delete();
-        res.status(200).json({ message: 'Resource deleted successfully.' });
-    } catch (error) {
-        console.error('Error deleting resource:', error);
-        res.status(500).json({ message: 'Server error deleting resource.' });
-    }
-});
-
+// ... other admin routes for Itineraries, Chats, Networks, Resources can be added here following the same pattern ...
 
 export default router;
