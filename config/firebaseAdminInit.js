@@ -1,70 +1,38 @@
-// File: config/firebaseAdminInit.js - Corrected
-
 import admin from 'firebase-admin';
-import { Storage } from '@google-cloud/storage'; // Import Storage
+import { getStorage } from 'firebase-admin/storage';
+import dotenv from 'dotenv';
 
-const serviceAccountJsonString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON; // Consistent variable name
-const databaseURL = process.env.FIREBASE_DATABASE_URL; // Add database URL env var
+dotenv.config();
 
-let initializedAuth;
-let initializedDb;
-let initializedStorage; 
+let app;
+const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
 
-// Ensure Firebase Admin SDK is initialized only once
-if (!admin.apps.length) {
-  if (!serviceAccountJsonString) {
-    console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON is NOT set or is empty! Cannot initialize Firebase Admin SDK.");
-    process.exit(1); 
-  }
-  if (!databaseURL) { // Check for database URL
-    console.error("FATAL: FIREBASE_DATABASE_URL is NOT set! Cannot initialize Firebase Admin SDK.");
-    process.exit(1); 
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountJsonString); 
-
-    const app = admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      databaseURL: databaseURL, 
-    });
-    console.log("Firebase Admin SDK initialized successfully.");
-
-    initializedAuth = app.auth();
-    initializedDb = app.firestore();
-    initializedStorage = new Storage({
-      projectId: serviceAccount.project_id, 
-      credentials: {
-        client_email: serviceAccount.client_email,
-        private_key: serviceAccount.private_key, 
-      }
-    }).bucket(`${serviceAccount.project_id}.appspot.com`); 
-    console.log("Firebase Storage initialized successfully.");
-
-  } catch (error) {
-    console.error("FATAL: Error initializing Firebase Admin SDK or Storage:", error.message);
-    console.error("Please ensure FIREBASE_SERVICE_ACCOUNT_JSON is a valid JSON string and FIREBASE_DATABASE_URL is set.");
-    process.exit(1); 
-  }
-} else {
-  // If app is already initialized, get the existing app instance
-  const app = admin.app();
-  console.log("Firebase Admin SDK already initialized.");
-  initializedAuth = app.auth();
-  initializedDb = app.firestore();
-  // Re-initialize storage using existing app context if needed, ensure serviceAccountJsonString is available
-  const serviceAccount = JSON.parse(serviceAccountJsonString); 
-  initializedStorage = new Storage({
-      projectId: serviceAccount.project_id,
-      credentials: {
-        client_email: serviceAccount.client_email,
-        private_key: serviceAccount.private_key,
-      }
-    }).bucket(`${serviceAccount.project_id}.appspot.com`);
+if (!serviceAccountString) {
+    console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set.");
+    process.exit(1);
 }
 
-// Export all necessary instances
-export const adminApp = admin; // Export the admin object itself
-export const auth = initializedAuth;
-export const db = initializedDb;
-export const bucket = initializedStorage;
+try {
+    const serviceAccount = JSON.parse(serviceAccountString);
+
+    if (!admin.apps.length) {
+        app = admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+            databaseURL: process.env.FIREBASE_DATABASE_URL,
+            storageBucket: `${serviceAccount.project_id}.appspot.com`
+        });
+        console.log("Firebase Admin SDK initialized successfully.");
+    } else {
+        app = admin.app();
+        console.log("Firebase Admin SDK already initialized.");
+    }
+} catch (error) {
+    console.error("FATAL: Error parsing FIREBASE_SERVICE_ACCOUNT_JSON or initializing Firebase Admin SDK.", error);
+    process.exit(1);
+}
+
+// Export initialized services
+export const db = admin.firestore();
+export const auth = admin.auth();
+export const bucket = getStorage().bucket();
+export const adminApp = admin; // Export the admin namespace itself for things like FieldValue
