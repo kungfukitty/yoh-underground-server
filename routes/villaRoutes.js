@@ -5,10 +5,10 @@ import { authenticateToken, checkAdmin } from '../middleware/authMiddleware.js';
 const router = Router();
 
 /**
- * Helper to format Firestore Timestamps into ISO strings for a booking object.
+ * Helper to format booking data, hiding sensitive fields for non-admins.
  * @param {object} data - The booking data from Firestore.
  * @param {boolean} isAdmin - Flag to determine if sensitive fields should be included.
- * @returns {object} - The booking data with timestamps converted.
+ * @returns {object} - The formatted booking data.
  */
 const formatBookingData = (data, isAdmin = false) => {
     const formattedData = {
@@ -23,7 +23,7 @@ const formatBookingData = (data, isAdmin = false) => {
     if (!isAdmin) {
         delete formattedData.price;
         delete formattedData.propertyContactInfo;
-        delete formattedData.createdBy; // Also good to hide who created it
+        delete formattedData.createdBy;
     }
 
     return formattedData;
@@ -48,53 +48,11 @@ adminRouter.get('/', async (req, res) => {
     }
 });
 
-// POST to create a new booking (for admins)
-adminRouter.post('/', async (req, res) => {
-    const {
-        memberId, villaName, checkIn, checkOut, status = 'Confirmed', notes,
-        numberOfGuests, price, paymentStatus, propertyType, propertyContactInfo, propertyRules
-    } = req.body;
-
-    if (!memberId || !villaName || !checkIn || !checkOut) {
-        return res.status(400).json({ message: 'Missing required fields: memberId, villaName, checkIn, checkOut.' });
-    }
-
-    try {
-        const newBooking = {
-            // Core Info
-            memberId,
-            villaName,
-            checkIn: adminApp.firestore.Timestamp.fromDate(new Date(checkIn)),
-            checkOut: adminApp.firestore.Timestamp.fromDate(new Date(checkOut)),
-            status,
-            notes: notes || '',
-
-            // New Fields
-            numberOfGuests: Number(numberOfGuests) || null,
-            price: price || null, // Stored as provided (e.g., number or string like "$5,000")
-            paymentStatus: paymentStatus || 'Pending',
-            propertyType: propertyType || null,
-            propertyContactInfo: propertyContactInfo || null,
-            propertyRules: propertyRules || '',
-
-            // Metadata
-            createdBy: req.user.id,
-            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
-            updatedAt: adminApp.firestore.FieldValue.serverTimestamp()
-        };
-
-        const docRef = await db.collection('villaBookings').add(newBooking);
-        res.status(201).json({ message: 'Booking created successfully.', id: docRef.id });
-    } catch (error) {
-        console.error('Admin error creating booking:', error);
-        res.status(500).json({ message: 'Server error creating booking.' });
-    }
-});
-
 // GET a single booking by ID (for admins)
-adminRouter.get('/:id', async (req, res) => {
+adminRouter.get('/:bookingId', async (req, res) => {
     try {
-        const doc = await db.collection('villaBookings').doc(req.params.id).get();
+        const { bookingId } = req.params;
+        const doc = await db.collection('villaBookings').doc(bookingId).get();
         if (!doc.exists) {
             return res.status(404).json({ message: 'Booking not found.' });
         }
@@ -108,27 +66,56 @@ adminRouter.get('/:id', async (req, res) => {
     }
 });
 
+// POST to create a new booking (for admins)
+adminRouter.post('/', async (req, res) => {
+    const {
+        memberId, villaName, checkIn, checkOut, status = 'Confirmed', notes,
+        numberOfGuests, price, paymentStatus, propertyType, propertyContactInfo, propertyRules
+    } = req.body;
+
+    if (!memberId || !villaName || !checkIn || !checkOut) {
+        return res.status(400).json({ message: 'Missing required fields: memberId, villaName, checkIn, checkOut.' });
+    }
+
+    try {
+        const newBooking = {
+            memberId, villaName, status, notes: notes || '',
+            checkIn: adminApp.firestore.Timestamp.fromDate(new Date(checkIn)),
+            checkOut: adminApp.firestore.Timestamp.fromDate(new Date(checkOut)),
+            numberOfGuests: Number(numberOfGuests) || null,
+            price: price || null,
+            paymentStatus: paymentStatus || 'Pending',
+            propertyType: propertyType || null,
+            propertyContactInfo: propertyContactInfo || null,
+            propertyRules: propertyRules || '',
+            createdBy: req.user.id,
+            createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
+            updatedAt: adminApp.firestore.FieldValue.serverTimestamp()
+        };
+
+        const docRef = await db.collection('villaBookings').add(newBooking);
+        res.status(201).json({ message: 'Booking created successfully.', id: docRef.id });
+    } catch (error) {
+        console.error('Admin error creating booking:', error);
+        res.status(500).json({ message: 'Server error creating booking.' });
+    }
+});
+
 // PUT to update a booking (for admins)
-adminRouter.put('/:id', async (req, res) => {
-    const { id } = req.params;
+adminRouter.put('/:bookingId', async (req, res) => {
+    const { bookingId } = req.params;
     const updates = { ...req.body };
     
     try {
-        const bookingRef = db.collection('villaBookings').doc(id);
+        const bookingRef = db.collection('villaBookings').doc(bookingId);
         const doc = await bookingRef.get();
         if (!doc.exists) {
             return res.status(404).json({ message: 'Booking not found.' });
         }
 
-        if (updates.checkIn) {
-            updates.checkIn = adminApp.firestore.Timestamp.fromDate(new Date(updates.checkIn));
-        }
-        if (updates.checkOut) {
-            updates.checkOut = adminApp.firestore.Timestamp.fromDate(new Date(updates.checkOut));
-        }
-        if (updates.numberOfGuests) {
-            updates.numberOfGuests = Number(updates.numberOfGuests);
-        }
+        if (updates.checkIn) updates.checkIn = adminApp.firestore.Timestamp.fromDate(new Date(updates.checkIn));
+        if (updates.checkOut) updates.checkOut = adminApp.firestore.Timestamp.fromDate(new Date(updates.checkOut));
+        if (updates.numberOfGuests) updates.numberOfGuests = Number(updates.numberOfGuests);
         updates.updatedAt = adminApp.firestore.FieldValue.serverTimestamp();
 
         await bookingRef.update(updates);
@@ -140,13 +127,9 @@ adminRouter.put('/:id', async (req, res) => {
 });
 
 // DELETE a booking (for admins)
-adminRouter.delete('/:id', async (req, res) => {
+adminRouter.delete('/:bookingId', async (req, res) => {
     try {
-        const bookingRef = db.collection('villaBookings').doc(req.params.id);
-        const doc = await bookingRef.get();
-        if (!doc.exists) {
-            return res.status(404).json({ message: 'Booking not found.' });
-        }
+        const bookingRef = db.collection('villaBookings').doc(req.params.bookingId);
         await bookingRef.delete();
         res.status(200).json({ message: 'Booking deleted successfully.' });
     } catch (error) {
@@ -183,6 +166,6 @@ memberRouter.get('/my-bookings', async (req, res) => {
 // --- Main Router ---
 // Mount the admin and member routers with appropriate base paths
 router.use('/admin', adminRouter);
-router.use('/', memberRouter); // Member routes are at the base of /api/villas
+router.use('/', memberRouter);
 
 export default router;
