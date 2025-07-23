@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Import Firebase Admin SDK initialization
-import { db, auth, bucket } from './config/firebaseAdminInit.js';
+import { db, auth, bucket } from '../config/firebaseAdminInit.js';
 
 // Import routes
 import authRoutes from './routes/authRoutes.js';
@@ -20,16 +20,13 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // --- Middleware ---
-
-// CORS configuration
-const allowedOrigins = [
-    'http://localhost:3000', // For local development
-    'http://www.yohunderground.fun',
-    'https://www.yohunderground.fun'
-];
-
-const corsOptions = {
+app.use(cors({
     origin: (origin, callback) => {
+        const allowedOrigins = [
+            'http://localhost:3000',
+            'http://www.yohunderground.fun',
+            'https://www.yohunderground.fun'
+        ];
         if (!origin || allowedOrigins.indexOf(origin) !== -1) {
             callback(null, true);
         } else {
@@ -39,14 +36,11 @@ const corsOptions = {
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
-};
-
-app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+}));
+app.options('*', cors());
 app.use(express.json());
 
 // --- API Routes ---
-
 app.get('/', (req, res) => {
     res.status(200).json({
         message: "YOH Underground Server is operational.",
@@ -68,7 +62,6 @@ app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send('Something broke!');
 });
-
 
 // --- Server Initialization ---
 if (process.env.NODE_ENV !== 'production') {
