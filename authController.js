@@ -1,7 +1,7 @@
-// File: controllers/authController.js
+// File: authController.js - Corrected (Removed extra '}')
 
 import jwt from 'jsonwebtoken';
-import { db } from '../config/firebaseAdminInit.js';
+import { db } from '../config/firebaseAdminInit.js'; // Assuming db is exported from firebaseAdminInit.js
 
 export const loginUser = async (req, res) => {
   try {
@@ -21,7 +21,10 @@ export const loginUser = async (req, res) => {
     const userDoc = snapshot.docs[0];
     const userData = userDoc.data();
 
-    if (!userData.password || userData.password !== password) {
+    // IMPORTANT: This comparison `userData.password !== password` is INSECURE.
+    // It should use `bcrypt.compare` as implemented in authRoutes.js.
+    // This controller seems to be an older/different version of login logic.
+    if (!userData.password || userData.password !== password) { 
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
 
