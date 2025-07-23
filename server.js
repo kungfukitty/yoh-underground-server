@@ -1,3 +1,4 @@
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -38,13 +39,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// --- MODIFIED LINE HERE ---
-// Mount authentication routes under the '/auth' path
-app.use('/auth', authRoutes);
-// If you want auth routes directly at the root (e.g., /claim, /login), use:
-// app.use('/', authRoutes);
-// Choose one of the above based on your desired final URL structure.
-// For now, '/auth' is a good balance.
+// Mount authentication routes under the '/api/auth' path
+app.use('/api/auth', authRoutes);
 
 // For local development
 app.listen(PORT, () => {
