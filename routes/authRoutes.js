@@ -2,6 +2,7 @@ import { Router } from 'express';
 import admin from 'firebase-admin';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+
 const admin = require('firebase-admin');
 
 if (!admin.apps.length) {
@@ -9,7 +10,6 @@ if (!admin.apps.length) {
     credential: admin.credential.applicationDefault(), // or use a service account
   });
 }
-
 
 const router = Router();
 
