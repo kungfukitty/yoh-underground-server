@@ -48,7 +48,7 @@ router.post('/invite', async (req, res) => {
             referredName: referredName,
             referredEmail: referredEmail,
             status: 'Invited',
-            rewardStatus: 'Pending',
+            rewardStatus: 'Pending', // Initial reward status
             createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
             updatedAt: adminApp.firestore.FieldValue.serverTimestamp(),
         });
@@ -104,30 +104,90 @@ adminRouter.get('/', async (req, res) => {
 });
 
 // PUT /api/referrals/admin/:referralId/status
-// Admin updates the status of a referral.
+// Admin updates the status of a referral and handles reward creation.
 adminRouter.put('/:referralId/status', async (req, res) => {
     const { referralId } = req.params;
-    const { status } = req.body;
+    const { status, rewardType = 'Standard Referral Reward' } = req.body;
     const adminId = req.user.id;
 
     const allowedStatuses = ['Invited', 'Application Submitted', 'Under Review', 'Interview Scheduled', 'Approved', 'Rejected'];
     if (!status || !allowedStatuses.includes(status)) {
-        return res.status(400).json({ message: 'A valid status is required.' });
+        return res.status(400).json({ message: 'A valid status from the vetting process is required.' });
     }
 
     const referralRef = db.collection('referrals').doc(referralId);
 
     try {
-        await referralRef.update({
-            status: status,
-            updatedAt: adminApp.firestore.FieldValue.serverTimestamp()
-        });
+        const referralDoc = await referralRef.get();
+        if (!referralDoc.exists) {
+            return res.status(404).json({ message: 'Referral not found.' });
+        }
+        const referralData = referralDoc.data();
+
+        // --- Improvement: Add Reward Creation Logic ---
+        if (status === 'Approved' && referralData.rewardStatus === 'Pending') {
+            await db.collection('rewards').add({
+                referrerId: referralData.referrerId,
+                referralId: referralId,
+                rewardType: rewardType,
+                status: 'Pending', // Reward is created but needs to be fulfilled
+                createdAt: adminApp.firestore.FieldValue.serverTimestamp(),
+                issuedBy: adminId,
+            });
+            await referralRef.update({ status: status, rewardStatus: 'Issued', updatedAt: adminApp.firestore.FieldValue.serverTimestamp() });
+        } else {
+            await referralRef.update({ status: status, updatedAt: adminApp.firestore.FieldValue.serverTimestamp() });
+        }
         
         res.status(200).json({ message: `Referral status updated to ${status}.` });
 
     } catch (error) {
         console.error('Admin error updating referral status:', error);
         res.status(500).json({ message: 'Server error updating referral status.' });
+    }
+});
+
+// --- NEW: Admin Reward Management Endpoints ---
+
+// GET /api/referrals/admin/rewards
+// Gets all reward records for the admin dashboard.
+adminRouter.get('/rewards', async (req, res) => {
+    try {
+        const snapshot = await db.collection('rewards').orderBy('createdAt', 'desc').get();
+        const rewards = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        res.status(200).json({ message: 'All rewards retrieved successfully.', rewards });
+    } catch (error) {
+        console.error('Admin error fetching rewards:', error);
+        res.status(500).json({ message: 'Server error retrieving rewards.' });
+    }
+});
+
+// PUT /api/referrals/admin/rewards/:rewardId/status
+// Admin updates the status of a specific reward (e.g., from 'Pending' to 'Fulfilled').
+adminRouter.put('/rewards/:rewardId/status', async (req, res) => {
+    const { rewardId } = req.params;
+    const { status } = req.body;
+    const adminId = req.user.id;
+
+    const allowedStatuses = ['Pending', 'Issued', 'Fulfilled', 'Declined'];
+    if (!status || !allowedStatuses.includes(status)) {
+        return res.status(400).json({ message: 'A valid reward status is required.' });
+    }
+
+    const rewardRef = db.collection('rewards').doc(rewardId);
+    try {
+        await rewardRef.update({
+            status: status,
+            updatedAt: adminApp.firestore.FieldValue.serverTimestamp(),
+            updatedBy: adminId
+        });
+        res.status(200).json({ message: `Reward status updated to ${status}.` });
+    } catch (error) {
+        console.error('Admin error updating reward status:', error);
+        res.status(500).json({ message: 'Server error updating reward.' });
     }
 });
 
