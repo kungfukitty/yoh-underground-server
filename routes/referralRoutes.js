@@ -124,7 +124,7 @@ adminRouter.put('/:referralId/status', async (req, res) => {
         }
         const referralData = referralDoc.data();
 
-        // --- Improvement: Add Reward Creation Logic ---
+        // --- Reward Creation Logic ---
         if (status === 'Approved' && referralData.rewardStatus === 'Pending') {
             await db.collection('rewards').add({
                 referrerId: referralData.referrerId,
@@ -147,7 +147,7 @@ adminRouter.put('/:referralId/status', async (req, res) => {
     }
 });
 
-// --- NEW: Admin Reward Management Endpoints ---
+// --- Admin Reward Management Endpoints ---
 
 // GET /api/referrals/admin/rewards
 // Gets all reward records for the admin dashboard.
