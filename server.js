@@ -1,62 +1,92 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import admin from 'firebase-admin';
-import authRoutes from './routes/authRoutes.js';
 
+// Load environment variables
 dotenv.config();
+
+// Import Firebase Admin SDK initialization
+// This will automatically initialize Firebase and export the necessary instances
+import { db, auth, bucket } from './config/firebaseAdminInit.js';
+
+// Import routes
+import authRoutes from './routes/authRoutes.js';
+import memberRoutes from './routes/memberRoutes.js';
+import eventRoutes from './routes/eventRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import villaRoutes from './routes/villaRoutes.js';
+// Note: Offer, Referral, and Security routes were not fully implemented.
+// If needed, they can be built out following the pattern of the other route files.
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Firebase Admin SDK initialization
-try {
-const encodedServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
-
-if (!encodedServiceAccount) {
-throw new Error("FIREBASE_SERVICE_ACCOUNT environment variable is not set or is empty.");
-}
-
-const serviceAccount = JSON.parse(Buffer.from(encodedServiceAccount, 'base64').toString('utf8'));
-
-if (!admin.apps.length) {
-admin.initializeApp({
-credential: admin.credential.cert(serviceAccount)
-});
-console.log("Firebase Admin SDK initialized successfully.");
-}
-} catch (error) {
-console.error("Error initializing Firebase Admin SDK:", error.message);
-console.log("Please ensure you have a valid FIREBASE_SERVICE_ACCOUNT (Base64 encoded) environment variable in Render.");
-}
+// --- Middleware ---
 
 // CORS configuration
+const allowedOrigins = [
+    'http://localhost:3000', // For local development
+    'http://www.yohunderground.fun',
+    'https://www.yohunderground.fun'
+];
+
 const corsOptions = {
-origin: 'http://www.yohunderground.fun',
-methods: ['GET', 'POST', 'OPTIONS'],
-credentials: true
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // Handle preflight requests
 
+// Handle preflight requests across all routes
+app.options('*', cors(corsOptions));
+
+// Body parser middleware
 app.use(express.json());
+
+// --- API Routes ---
 
 // Main welcome route
 app.get('/', (req, res) => {
-res.status(200).json({
-message: "YOH Underground Server is operational.",
-status: "OK",
-timestamp: new Date().toISOString()
-});
+    res.status(200).json({
+        message: "YOH Underground Server is operational.",
+        status: "OK",
+        timestamp: new Date().toISOString()
+    });
 });
 
-// Mount authentication routes under the '/api/auth' path
+// Mount application routes
 app.use('/api/auth', authRoutes);
+app.use('/api/member', memberRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/villas', villaRoutes);
 
-// For local development
-app.listen(PORT, () => {
-console.log(`Server is running on port ${PORT}`);
+// --- Error Handling ---
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something broke!');
 });
 
-// For Vercel deployment, export the app instance
+
+// --- Server Initialization ---
+
+// This check ensures we only start the listener when running locally
+// Vercel handles the server lifecycle automatically
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(PORT, () => {
+        console.log(`Server is running locally on http://localhost:${PORT}`);
+    });
+}
+
+// Export the app instance for Vercel
 export default app;
