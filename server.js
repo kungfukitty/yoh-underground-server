@@ -1,28 +1,62 @@
-2025-07-23T19:02:22.904Z [error] Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/routes/offerRoutes.js' imported from /var/task/server.js
-    at finalizeResolution (node:internal/modules/esm/resolve:281:11)
-    at moduleResolve (node:internal/modules/esm/resolve:866:10)
-    at moduleResolveWithNodePath (node:internal/modules/esm/resolve:990:14)
-    at defaultResolve (node:internal/modules/esm/resolve:1033:79)
-    at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:780:12)
-    at #cachedDefaultResolve (node:internal/modules/esm/loader:704:25)
-    at ModuleLoader.resolve (node:internal/modules/esm/loader:687:38)
-    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:305:38)
-    at ModuleJob._link (node:internal/modules/esm/module_job:137:49) {
-  code: 'ERR_MODULE_NOT_FOUND',
-  url: 'file:///var/task/routes/offerRoutes.js'
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import admin from 'firebase-admin';
+import authRoutes from './routes/authRoutes.js';
+
+dotenv.config();
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// Firebase Admin SDK initialization
+try {
+  const encodedServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
+
+  if (!encodedServiceAccount) {
+    throw new Error("FIREBASE_SERVICE_ACCOUNT environment variable is not set or is empty.");
+  }
+
+  const serviceAccount = JSON.parse(Buffer.from(encodedServiceAccount, 'base64').toString('utf8'));
+
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log("Firebase Admin SDK initialized successfully.");
+  }
+} catch (error) {
+  console.error("Error initializing Firebase Admin SDK:", error.message);
+  console.log("Please ensure you have a valid FIREBASE_SERVICE_ACCOUNT (Base64 encoded) environment variable in Render.");
 }
-Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
-Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/routes/offerRoutes.js' imported from /var/task/server.js
-    at finalizeResolution (node:internal/modules/esm/resolve:281:11)
-    at moduleResolve (node:internal/modules/esm/resolve:866:10)
-    at moduleResolveWithNodePath (node:internal/modules/esm/resolve:990:14)
-    at defaultResolve (node:internal/modules/esm/resolve:1033:79)
-    at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:780:12)
-    at #cachedDefaultResolve (node:internal/modules/esm/loader:704:25)
-    at ModuleLoader.resolve (node:internal/modules/esm/loader:687:38)
-    at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:305:38)
-    at ModuleJob._link (node:internal/modules/esm/module_job:137:49) {
-  code: 'ERR_MODULE_NOT_FOUND',
-  url: 'file:///var/task/routes/offerRoutes.js'
-}
-Node.js process exited with exit status: 1. The logs above can help with debugging the issue.
+
+// CORS configuration
+const corsOptions = {
+  origin: 'http://www.yohunderground.fun',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
+
+app.use(express.json());
+
+// Main welcome route
+app.get('/', (req, res) => {
+  res.status(200).json({
+    message: "YOH Underground Server is operational.",
+    status: "OK",
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Mount authentication routes under the '/api/auth' path
+app.use('/api/auth', authRoutes);
+
+// For local development
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+// For Vercel deployment, export the app instance
+export default app;
