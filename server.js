@@ -16,7 +16,7 @@ import eventRoutes from './routes/eventRoutes.js';
 import villaRoutes from './routes/villaRoutes.js';
 import referralRoutes from './routes/referralRoutes.js';
 import offerRoutes from './routes/offerRoutes.js';
-import securityRoutes from './routes/securityRoutes.js'; // <-- ADDED
+import securityRoutes from './routes/securityRoutes.js';
 
 // Admin-Specific Routes
 import adminUserRoutes from './routes/userRoutes.js';
@@ -30,24 +30,32 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // --- Middleware ---
-app.use(cors({
-    origin: (origin, callback) => {
-        const allowedOrigins = [
-            'http://localhost:3000',
-            'http://www.yohunderground.fun',
-            'https://www.yohunderground.fun'
-        ];
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
+
+// --- CORRECTED CORS CONFIGURATION ---
+const allowedOrigins = [
+    'http://localhost:3000',
+    'http://www.yohunderground.fun',
+    'https://www.yohunderground.fun'
+];
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        // allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
         }
+        return callback(null, true);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
-}));
-app.options('*', cors());
+};
+
+// Use CORS middleware for all routes. This will handle preflight requests automatically.
+app.use(cors(corsOptions));
+
 app.use(express.json());
 
 // --- API Routes ---
@@ -73,7 +81,7 @@ app.use('/api/admin/itineraries', adminItineraryRoutes);
 app.use('/api/admin/chats', adminChatRoutes);
 app.use('/api/admin/networks', adminNetworkRoutes);
 app.use('/api/admin/resources', adminResourceRoutes);
-app.use('/api/admin/security', securityRoutes); // <-- ADDED
+app.use('/api/admin/security', securityRoutes);
 
 
 // --- Error Handling ---
