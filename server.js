@@ -14,7 +14,7 @@ import memberRoutes from './routes/memberRoutes.js';
 import eventRoutes from './routes/eventRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import villaRoutes from './routes/villaRoutes.js';
-import referralRoutes from './routes/referralRoutes.js'; // <-- ADDED
+import referralRoutes from './routes/referralRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -61,7 +61,7 @@ app.use('/api/member', memberRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/villas', villaRoutes);
-app.use('/api/referrals', referralRoutes); // <-- ADDED
+app.use('/api/referrals', referralRoutes);
 
 // --- Error Handling ---
 app.use((err, req, res, next) => {
