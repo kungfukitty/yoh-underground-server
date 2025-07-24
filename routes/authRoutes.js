@@ -31,7 +31,54 @@ const generateToken = (userId, isAdmin = false) => {
 
 // Route to claim an access code
 router.post('/claim-code', async (req, res) => {
-    // ... (existing code remains the same)
+    const { accessCode, password } = req.body;
+
+    if (!accessCode || !password) {
+        return res.status(400).json({ message: 'Access code and password are required.' });
+    }
+
+    try {
+        const usersRef = db.collection('users');
+        const snapshot = await usersRef.where('accessCode', '==', accessCode).limit(1).get();
+
+        if (snapshot.empty) {
+            return res.status(404).json({ message: 'Invalid access code.' });
+        }
+
+        const userDoc = snapshot.docs[0];
+        const userData = userDoc.data();
+
+        if (userData.isClaimed) {
+            return res.status(400).json({ message: 'This access code has already been claimed.' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        await usersRef.doc(userDoc.id).update({
+            password: hashedPassword,
+            isClaimed: true,
+            activatedAt: adminApp.firestore.FieldValue.serverTimestamp(),
+        });
+
+        const token = generateToken(userDoc.id, userData.isAdmin || false);
+        if (!token) {
+            return res.status(500).json({ message: 'Server configuration error.' });
+        }
+        
+        const { password: _, accessCode: __, ...userProfile } = userData;
+
+
+        res.status(200).json({
+            message: 'Account activated successfully.',
+            token,
+            user: { id: userDoc.id, ...userProfile }
+        });
+
+    } catch (error) {
+        console.error('Error claiming access code:', error);
+        res.status(500).json({ message: 'Server error during account activation.' });
+    }
 });
 
 // Route for user login
