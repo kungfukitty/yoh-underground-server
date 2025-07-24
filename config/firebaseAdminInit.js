@@ -1,13 +1,26 @@
 import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
 
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+const { FIREBASE_SERVICE_ACCOUNT_KEY } = process.env;
 
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-});
+if (!FIREBASE_SERVICE_ACCOUNT_KEY) {
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set.');
+}
 
-const db = getFirestore();
+let serviceAccount: admin.ServiceAccount;
+
+try {
+  serviceAccount = JSON.parse(FIREBASE_SERVICE_ACCOUNT_KEY);
+} catch (error) {
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON.');
+}
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
+
+const db = admin.firestore();
 const adminApp = admin;
 
 export { db, adminApp };
