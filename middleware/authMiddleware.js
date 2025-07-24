@@ -32,14 +32,6 @@ export const checkAdmin = async (req, res, next) => {
         return res.status(401).json({ message: 'User not authenticated.' });
     }
     
-    // You can rely on the isAdmin flag set in the JWT for efficiency,
-    // but a database check is more secure if roles can change mid-session.
-    if (!req.user.isAdmin) {
-         return res.status(403).json({ message: 'Admin access required.' });
-    }
-    
-    // Optional: For higher security, re-verify admin status from the database on every request.
-    /*
     try {
         const userDoc = await db.collection('users').doc(req.user.id).get();
         if (!userDoc.exists || !userDoc.data().isAdmin) {
@@ -50,9 +42,6 @@ export const checkAdmin = async (req, res, next) => {
         console.error('Error checking admin status:', error);
         res.status(500).json({ message: 'Server error checking admin status.' });
     }
-    */
-   
-    next();
 };
 
 
