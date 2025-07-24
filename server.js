@@ -61,19 +61,19 @@ app.get('/', (req, res) => {
 });
 
 // Mount all application routes
-app.use('/api/auth', authRoutes);
-app.use('/api/member', memberRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/villas', villaRoutes);
-app.use('/api/referrals', referralRoutes);
+app.use('/auth', authRoutes);
+app.use('/member', memberRoutes);
+app.use('/events', eventRoutes);
+app.use('/villas', villaRoutes);
+app.use('/referrals', referralRoutes);
 
 // Mount all admin routes
-app.use('/api/admin/users', adminUserRoutes);
-app.use('/api/admin/itineraries', adminItineraryRoutes);
-app.use('/api/admin/chats', adminChatRoutes);
-app.use('/api/admin/networks', adminNetworkRoutes);
-app.use('/api/admin/resources', adminResourceRoutes);
-app.use('/api/admin/security', securityRoutes);
+app.use('/admin/users', adminUserRoutes);
+app.use('/admin/itineraries', adminItineraryRoutes);
+app.use('/admin/chats', adminChatRoutes);
+app.use('/admin/networks', adminNetworkRoutes);
+app.use('/admin/resources', adminResourceRoutes);
+app.use('/admin/security', securityRoutes);
 
 // --- Error Handling ---
 app.use((err, req, res, next) => {
