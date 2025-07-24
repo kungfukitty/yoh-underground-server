@@ -6,7 +6,6 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Import Firebase Admin SDK initialization
-// Note: Ensure your config/firebaseAdminInit.js is correct and you have set the environment variables in Vercel
 import { db, adminApp } from './config/firebaseAdminInit.js';
 
 // --- Import All Your Routes ---
@@ -52,7 +51,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // --- API Routes ---
-app.get('/', (req, res) => {
+app.get('/api', (req, res) => {
     res.status(200).json({
         message: "YOH Underground Server is operational.",
         status: "OK",
@@ -60,20 +59,20 @@ app.get('/', (req, res) => {
     });
 });
 
-// Mount all application routes
-app.use('/auth', authRoutes);
-app.use('/member', memberRoutes);
-app.use('/events', eventRoutes);
-app.use('/villas', villaRoutes);
-app.use('/referrals', referralRoutes);
+// Mount all application routes with the /api prefix
+app.use('/api/auth', authRoutes);
+app.use('/api/member', memberRoutes);
+app.use('/api/events', eventRoutes);
+app.use('/api/villas', villaRoutes);
+app.use('/api/referrals', referralRoutes);
 
-// Mount all admin routes
-app.use('/admin/users', adminUserRoutes);
-app.use('/admin/itineraries', adminItineraryRoutes);
-app.use('/admin/chats', adminChatRoutes);
-app.use('/admin/networks', adminNetworkRoutes);
-app.use('/admin/resources', adminResourceRoutes);
-app.use('/admin/security', securityRoutes);
+// Mount all admin routes with the /api prefix
+app.use('/api/admin/users', adminUserRoutes);
+app.use('/api/admin/itineraries', adminItineraryRoutes);
+app.use('/api/admin/chats', adminChatRoutes);
+app.use('/api/admin/networks', adminNetworkRoutes);
+app.use('/api/admin/resources', adminResourceRoutes);
+app.use('/api/admin/security', securityRoutes);
 
 // --- Error Handling ---
 app.use((err, req, res, next) => {
