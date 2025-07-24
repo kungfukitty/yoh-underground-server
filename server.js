@@ -28,23 +28,22 @@ const PORT = process.env.PORT || 5000;
 
 // --- Middleware ---
 const allowedOrigins = [
-    'http://localhost:3000',
-    'http://www.yohunderground.fun',
-    'https://www.yohunderground.fun'
+  'http://www.yohunderground.fun',
+  'https://www.yohunderground.fun'
 ];
 
 const corsOptions = {
-    origin: function (origin, callback) {
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-            callback(new Error(msg), false);
-        }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      callback(new Error(msg), false);
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 };
 
 app.use(cors(corsOptions));
@@ -52,11 +51,11 @@ app.use(express.json());
 
 // --- API Routes ---
 app.get('/api', (req, res) => {
-    res.status(200).json({
-        message: "YOH Underground Server is operational.",
-        status: "OK",
-        timestamp: new Date().toISOString()
-    });
+  res.status(200).json({
+    message: "YOH Underground Server is operational.",
+    status: "OK",
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Mount all application routes with the /api prefix
@@ -76,9 +75,16 @@ app.use('/api/admin/security', securityRoutes);
 
 // --- Error Handling ---
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ message: 'An unexpected server error occurred.' });
+  console.error(err.stack);
+  res.status(500).json({ message: 'An unexpected server error occurred.' });
 });
 
-// --- Server Initialization for Vercel ---
+// --- Server Initialization for Local Development ---
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// --- Export for Vercel ---
 export default app;
