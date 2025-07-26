@@ -1,30 +1,36 @@
+import express from 'express';
 import cors from 'cors';
+import dotenv from 'dotenv';
 
+dotenv.config();
+
+const app = express();
+
+// --- Dynamic CORS Config ---
 const allowedOrigins = new Set([
   'http://www.yohunderground.fun',
   'https://www.yohunderground.fun',
-  // add more origins if needed
 ]);
 
-const dynamicCorsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
+const corsOptions = {
+  origin: function (origin, callback) {
     if (!origin) {
+      // Allow requests like Postman, curl, or mobile apps
       return callback(null, true);
     }
 
     if (allowedOrigins.has(origin)) {
-      // Reflect the exact origin back in Access-Control-Allow-Origin header
-      return callback(null, origin);
+      return callback(null, origin); // Reflect the matched origin
     }
 
-    // Origin not allowed
-    return callback(new Error('CORS policy does not allow access from this origin'), false);
+    console.warn(`❌ CORS Rejected: ${origin}`);
+    return callback(new Error('CORS: Origin not allowed'), false);
   },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true, // Allow cookies and auth headers to be sent
-  optionsSuccessStatus: 204, // For legacy browsers support
+  optionsSuccessStatus: 204, // For legacy browsers
 };
 
-export default dynamicCorsOptions;
+app.use(cors(corsOptions));
+app.use(express.json());
