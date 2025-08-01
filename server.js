@@ -34,3 +34,4 @@ app.use('*', (req, res) => res.status(404).json({
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
