@@ -1,34 +1,24 @@
-import admin from 'firebase-admin';
+mport admin from 'firebase-admin';
 
-// Get the service account key from environment variables
-const FIREBASE_SERVICE_ACCOUNT_KEY = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-
-// Check if the environment variable is set and not empty
-if (!FIREBASE_SERVICE_ACCOUNT_KEY || FIREBASE_SERVICE_ACCOUNT_KEY.trim() === '') {
-  console.error('FATAL ERROR: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or is empty.');
-  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is required for server to start.');
+const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+if (!raw) {
+  console.error('FATAL: FIREBASE_SERVICE_ACCOUNT_KEY is missing');
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is required');
 }
 
-let serviceAccount;
-
+let creds;
 try {
-  // Parse the JSON string from the environment variable
-  serviceAccount = JSON.parse(FIREBASE_SERVICE_ACCOUNT_KEY);
-} catch (error) {
-  // If parsing fails, throw an explicit error
-  console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', error);
-  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON. Please ensure it is a valid JSON string.');
+  creds = JSON.parse(raw);
+} catch (err) {
+  console.error('Invalid JSON in FIREBASE_SERVICE_ACCOUNT_KEY:', err);
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY must be valid JSON');
 }
 
-// Initialize the Firebase app if it hasn't been initialized already
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+    credential: admin.credential.cert(creds),
   });
 }
 
-// Export Firestore and the admin app instance
-const db = admin.firestore();
-const adminApp = admin;
-
-export { db, adminApp };
+export const db = admin.firestore();
+export const adminApp = admin;
