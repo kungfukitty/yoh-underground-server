@@ -1,4 +1,4 @@
-mport admin from 'firebase-admin';
+import admin from 'firebase-admin';
 
 const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 if (!raw) {
