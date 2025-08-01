@@ -9,23 +9,18 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // --- CORS Configuration ---
-// This is the code you provided, integrated into the server setup.
-const allowedOrigins = new Set([
+// Define the specific origins that are allowed to make requests to this server.
+const allowedOrigins = [
   'https://www.yohunderground.fun',
-  'http://www.yohunderground.fun',
+  'http://www.yohunderground.fun', // Added for local development and explicit handling
   // You can add other development origins here if needed, e.g.:
   // 'http://localhost:5173',
-]);
+];
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) {
-      // Allow the request if the origin is in the allowed list or if there is no origin (e.g., for tools like Postman or same-origin requests)
-      return callback(null, origin || true);
-    }
-    // Block the request if the origin is not allowed
-    return callback(new Error(`Not allowed by CORS: ${origin}`));
-  },
+  // Pass the array of allowed origins to the middleware.
+  // The 'cors' package will handle the logic for matching the request origin.
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
