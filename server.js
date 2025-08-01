@@ -9,24 +9,28 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // --- CORS Configuration ---
-// Define the specific origins that are allowed to make requests to this server.
 const allowedOrigins = [
   'https://www.yohunderground.fun',
-  'http://www.yohunderground.fun', // Added to explicitly allow non-secure traffic
-  // It's a good practice to include your development origin here as well.
+  'http://www.yohunderground.fun',
+  // Include localhost if testing locally:
   // 'http://localhost:5173',
 ];
 
 const corsOptions = {
-  // Pass the array of allowed origins to the middleware.
-  // The 'cors' package will handle the logic for matching the request origin.
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.error('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
-// Use CORS middleware with the defined options
+// Use CORS middleware
 app.use(cors(corsOptions));
 
 // --- Body Parser Middleware ---
@@ -45,7 +49,7 @@ import networkRoutes from './routes/networkRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
 import itineraryRoutes from './routes/itineraryRoutes.js';
 
-// Define the API base path and apply routes
+// Apply API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/member', memberRoutes);
 app.use('/api/villa', villaRoutes);
@@ -58,14 +62,12 @@ app.use('/api/admin/networks', networkRoutes);
 app.use('/api/admin/resources', resourceRoutes);
 app.use('/api/admin/itineraries', itineraryRoutes);
 
-
-// Simple health check route
+// Health check route
 app.get('/', (req, res) => {
-    res.status(200).send('YOH Underground Server is operational.');
+  res.status(200).send('YOH Underground Server is operational.');
 });
 
-// --- Start the server ---
+// Start server
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
