@@ -1,38 +1,34 @@
 import admin from 'firebase-admin';
-import { getStorage } from 'firebase-admin/storage';
-import dotenv from 'dotenv';
 
-dotenv.config();
+// Get the service account key from environment variables
+const FIREBASE_SERVICE_ACCOUNT_KEY = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-let app;
-const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-
-if (!serviceAccountString) {
-    console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON environment variable is not set.");
-    process.exit(1);
+// Check if the environment variable is set and not empty
+if (!FIREBASE_SERVICE_ACCOUNT_KEY || FIREBASE_SERVICE_ACCOUNT_KEY.trim() === '') {
+  console.error('FATAL ERROR: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or is empty.');
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is required for server to start.');
 }
+
+let serviceAccount;
 
 try {
-    const serviceAccount = JSON.parse(serviceAccountString);
-
-    if (!admin.apps.length) {
-        app = admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            databaseURL: process.env.FIREBASE_DATABASE_URL,
-            storageBucket: `${serviceAccount.project_id}.appspot.com`
-        });
-        console.log("Firebase Admin SDK initialized successfully.");
-    } else {
-        app = admin.app();
-        console.log("Firebase Admin SDK already initialized.");
-    }
+  // Parse the JSON string from the environment variable
+  serviceAccount = JSON.parse(FIREBASE_SERVICE_ACCOUNT_KEY);
 } catch (error) {
-    console.error("FATAL: Error parsing FIREBASE_SERVICE_ACCOUNT_JSON or initializing Firebase Admin SDK.", error);
-    process.exit(1);
+  // If parsing fails, throw an explicit error
+  console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', error);
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON. Please ensure it is a valid JSON string.');
 }
 
-// Export initialized services
-export const db = admin.firestore();
-export const auth = admin.auth();
-export const bucket = getStorage().bucket();
-export const adminApp = admin; // Export the admin namespace itself for things like FieldValue
+// Initialize the Firebase app if it hasn't been initialized already
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
+
+// Export Firestore and the admin app instance
+const db = admin.firestore();
+const adminApp = admin;
+
+export { db, adminApp };
