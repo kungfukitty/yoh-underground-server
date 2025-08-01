@@ -12,8 +12,8 @@ const port = process.env.PORT || 3000;
 // Define the specific origins that are allowed to make requests to this server.
 const allowedOrigins = [
   'https://www.yohunderground.fun',
-  'http://www.yohunderground.fun', // Added for local development and explicit handling
-  // You can add other development origins here if needed, e.g.:
+  'http://www.yohunderground.fun', // Added to explicitly allow non-secure traffic
+  // It's a good practice to include your development origin here as well.
   // 'http://localhost:5173',
 ];
 
