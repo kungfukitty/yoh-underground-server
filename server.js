@@ -1,7 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 
-constconst allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+const app = express();
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
