@@ -10,7 +10,7 @@ let creds;
 try {
   creds = JSON.parse(raw);
 } catch (err) {
-  console.error('Invalid JSON in FIREBASE_SERVICE_ACCOUNT_KEY:', err);
+  console.error('Invalid FIREBASE_SERVICE_ACCOUNT_KEY format');
   throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY must be valid JSON');
 }
 
