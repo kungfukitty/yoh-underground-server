@@ -1,64 +1,34 @@
-// File: config/firebaseAdminInit.js
 import admin from 'firebase-admin';
-import { Storage } from '@google-cloud/storage';
 
-const serviceAccountJsonString = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+// Get the service account key from environment variables
+const FIREBASE_SERVICE_ACCOUNT_KEY = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
-
-let initializedAuth;
-let initializedDb;
-let initializedStorage;
-
-
-// Ensure Firebase Admin SDK is initialized only once
-if (!admin.apps.length) {
-    if (!serviceAccountJsonString) {
-        console.error("FATAL: FIREBASE_SERVICE_ACCOUNT_JSON is NOT set or is empty! Cannot initialize Firebase Admin SDK.");
-        process.exit(1);
-    }
-
-    try {
-        const serviceAccount = JSON.parse(serviceAccountJsonString);
-
-        const app = admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            databaseURL: process.env.FIREBASE_DATABASE_URL,
-        });
-        console.log("Firebase Admin SDK initialized successfully.");
-
-        initializedAuth = app.auth();
-        initializedDb = app.firestore();
-        initializedStorage = new Storage({
-            projectId: serviceAccount.project_id,
-            credentials: {
-                client_email: serviceAccount.client_email,
-                private_key: serviceAccount.private_key,
-            }
-        }).bucket(`${serviceAccount.project_id}.appspot.com`);
-        console.log("Firebase Storage initialized successfully.");
-
-    } catch (error) {
-        console.error("FATAL: Error initializing Firebase Admin SDK or Storage:", error.message);
-        console.error("Please ensure FIREBASE_SERVICE_ACCOUNT_JSON is a valid JSON string.");
-        process.exit(1);
-    }
-} else {
-    const app = admin.app();
-    console.log("Firebase Admin SDK already initialized.");
-    initializedAuth = app.auth();
-    initializedDb = app.firestore();
-    const serviceAccount = JSON.parse(serviceAccountJsonString);
-    initializedStorage = new Storage({
-        projectId: serviceAccount.project_id,
-        credentials: {
-            client_email: serviceAccount.client_email,
-            private_key: serviceAccount.private_key,
-        }
-    }).bucket(`${serviceAccount.project_id}.appspot.com`);
+// Check if the environment variable is set and not empty
+if (!FIREBASE_SERVICE_ACCOUNT_KEY || FIREBASE_SERVICE_ACCOUNT_KEY.trim() === '') {
+  console.error('FATAL ERROR: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or is empty.');
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is required for server to start.');
 }
 
-// Export the initialized auth, db, storage, AND admin instances for use in other modules
-export const adminApp = admin; // NEW: Export the admin object itself
-export const auth = initializedAuth;
-export const db = initializedDb;
-export const bucket = initializedStorage;
+let serviceAccount;
+
+try {
+  // Parse the JSON string from the environment variable
+  serviceAccount = JSON.parse(FIREBASE_SERVICE_ACCOUNT_KEY);
+} catch (error) {
+  // If parsing fails, throw an explicit error
+  console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', error);
+  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON. Please ensure it is a valid JSON string.');
+}
+
+// Initialize the Firebase app if it hasn't been initialized already
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
+
+// Export Firestore and the admin app instance
+const db = admin.firestore();
+const adminApp = admin;
+
+export { db, adminApp };
