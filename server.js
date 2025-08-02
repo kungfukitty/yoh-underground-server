@@ -1,37 +1,60 @@
+// File: server.js - COMPLETE AND UP-TO-DATE
+
+console.log("SERVER START: Entering server.js execution.");
 import express from 'express';
 import cors from 'cors';
-import authRouter from './routes/auth.js';
-import { adminApp } from './config/firebaseAdminInit.js';
+import dotenv from 'dotenv';
+// NEW: Import all necessary components from firebaseAdminInit.js, including bucket and adminApp
+import { auth, db, bucket, adminApp } from './config/firebaseAdminInit.js'; 
 
+
+dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 
-// Body parsing
+// --- Server Startup Debugging & JWT Secret Check ---
+console.log("DEBUG: Server starting...");
+
+const jwtSecret = process.env.JWT_SECRET;
+
+if (!jwtSecret) {
+    console.error("FATAL: JWT_SECRET is NOT set!");
+    process.exit(1);
+} else {
+    console.log("DEBUG: JWT_SECRET is set (length:", jwtSecret.length, ")");
+}
+// --- END Server Startup Debugging & JWT Secret Check ---
+
+
+app.use(cors());
 app.use(express.json());
 
-// CORS setup
-const allowed = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
-
-app.use(cors({
-  origin: (origin, cb) => {
-    if (!origin || allowed.includes(origin)) return cb(null, true);
-    cb(new Error(`CORS Blocked: ${origin}`));
-  },
-  credentials: true,
-}));
-app.options('*', cors());
-
-// Mount auth routes
-app.use('/api/auth', authRouter);
-
-// Fallback
-app.use('*', (req, res) => res.status(404).json({
-  message: 'Route not found',
-}));
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.get('/', (req, res) => {
+    res.status(200).json({
+        message: "YOH Underground Server is operational.",
+        status: "OK",
+        timestamp: new Date().toISOString(),
+        envCheck: "See logs for Firebase initialization status (from firebaseAdminInit.js)."
+    });
 });
+
+// Authentication Routes
+import authRoutes from './routes/authRoutes.js';
+app.use('/api/auth', authRoutes);
+
+// Member-specific Routes (NDA Management, Profile)
+import memberRoutes from './routes/memberRoutes.js'; // NEW: Import member routes
+app.use('/api/member', memberRoutes); // NEW: Mount member routes
+
+// Event Routes (Curated Event Calendar)
+import eventRoutes from './routes/eventRoutes.js'; // NEW: Import event routes
+app.use('/api/events', eventRoutes); // NEW: Mount event routes
+
+
+// For local development
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
+
+// For Vercel deployment, export the app instance
+export default app;
