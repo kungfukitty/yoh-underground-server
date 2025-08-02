@@ -1,8 +1,7 @@
-mport express from 'express';
+import express from 'express';
 import cors from 'cors';
 
-const app = express();
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+constconst allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
@@ -15,9 +14,10 @@ app.use(cors({
     }
     callback(new Error('Not allowed by CORS'), false);
   },
-  methods: [ 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS' ],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   credentials: true,
 }));
+
 app.options('*', cors());
 
 // ... other middleware & routes ...
