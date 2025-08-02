@@ -38,3 +38,4 @@ export const requirePrivileges = asyncHandler(async (req, res, next) => {
   // attach full user record if needed
   req.userRecord = data;
   next();
+});
