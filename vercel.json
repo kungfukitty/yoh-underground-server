@@ -5,7 +5,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "http://www.yohunderground.fun"
+          "value": "//www.yohunderground.fun"
         },
         {
           "key": "Access-Control-Allow-Methods",
@@ -19,3 +19,4 @@
     }
   ]
 }
+
