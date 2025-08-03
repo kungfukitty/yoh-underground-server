@@ -1,33 +1,34 @@
+// config/firebaseAdminInit.js
 import admin from 'firebase-admin';
+import dotenv from 'dotenv';
+dotenv.config();
 
-// Get the service account key from environment variables
-const FIREBASE_SERVICE_ACCOUNT_KEY = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+// Pull in the same env-vars you already have in Vercel:
+const {
+  FB_PROJECT_ID,
+  FB_CLIENT_EMAIL,
+  FB_PRIVATE_KEY,
+  FB_DATABASE_URL
+} = process.env;
 
-// Check if the environment variable is set and not empty
-if (!FIREBASE_SERVICE_ACCOUNT_KEY || FIREBASE_SERVICE_ACCOUNT_KEY.trim() === '') {
-  console.error('FATAL ERROR: FIREBASE_SERVICE_ACCOUNT_KEY environment variable is not set or is empty.');
-  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY environment variable is required for server to start.');
+if (!FB_PROJECT_ID || !FB_CLIENT_EMAIL || !FB_PRIVATE_KEY) {
+  console.error(
+    'FATAL ERROR: Missing one of FB_PROJECT_ID, FB_CLIENT_EMAIL, or FB_PRIVATE_KEY.'
+  );
+  throw new Error('Firebase environment variables not set.');
 }
 
-let serviceAccount;
+const serviceAccount = {
+  projectId: FB_PROJECT_ID,
+  clientEmail: FB_CLIENT_EMAIL,
+  privateKey: FB_PRIVATE_KEY.replace(/\\n/g, '\n'),
+};
 
-try {
-  // Parse the JSON string from the environment variable
-  serviceAccount = JSON.parse(FIREBASE_SERVICE_ACCOUNT_KEY);
-} catch (error) {
-  // If parsing fails, throw an explicit error
-  console.error('Error parsing FIREBASE_SERVICE_ACCOUNT_KEY:', error);
-  throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY is not valid JSON. Please ensure it is a valid JSON string.');
-}
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: FB_DATABASE_URL,
+});
 
-// Initialize the Firebase app if it hasn't been initialized already
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-}
-
-// Export Firestore and the admin app instance
 const db = admin.firestore();
 const adminApp = admin;
 
