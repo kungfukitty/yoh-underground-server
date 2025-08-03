@@ -1,6 +1,13 @@
 import jwt from 'jsonwebtoken';
-import asyncHandler from 'express-async-handler';
 import { db } from '../config/firebaseAdminInit.js';
+
+// Lightweight replacement for express-async-handler.  It wraps an async
+// route/middleware function and forwards any rejected promise to Express'
+// error handler.  This avoids the need for an external dependency that
+// was causing the deployment build to fail when the package was missing.
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
 
 // Verify token and attach user payload
 export const authenticateToken = (req, res, next) => {
