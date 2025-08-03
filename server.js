@@ -1,27 +1,40 @@
-// server.js
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import './config/firebaseAdminInit.js'; // your Firebase init
 
-// Initialize env
 dotenv.config();
-
-// Firebase Admin (via your existing init file)
-import './config/firebaseAdminInit.js';
 
 const app = express();
 
-// — very permissive CORS (for now) —
-app.use(cors({ origin: true, credentials: true }));
+// — CORS — allow your FreeHostia origin(s)
+const ALLOWED_ORIGINS = [
+  'https://www.yohunderground.fun',
+  'http://www.yohunderground.fun',
+  'https://yohunderground.fun',
+  'http://yohunderground.fun'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // allow tools like curl or Postman (no origin)
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
+  credentials: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization']
+}));
 app.options('*', cors());
 
 // Body parsing
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health-check endpoint
+// Health‐check
 app.get('/api/ping', (req, res) => {
-  return res.json({ ok: true, time: new Date().toISOString() });
+  res.json({ ok: true, time: new Date().toISOString() });
 });
 
 // Mount your existing routers
@@ -37,7 +50,6 @@ import resourceRoutes  from './routes/resourceRoutes.js';
 import securityRoutes  from './routes/securityRoutes.js';
 import villaRoutes     from './routes/villaRoutes.js';
 
-// All under /api
 app.use('/api/auth',       authRoutes);
 app.use('/api/users',      userRoutes);
 app.use('/api/chat',       chatRoutes);
@@ -50,11 +62,8 @@ app.use('/api/resources',  resourceRoutes);
 app.use('/api/security',   securityRoutes);
 app.use('/api/villas',     villaRoutes);
 
-// Fallback 404 for anything else
-app.use((req, res) => res.status(404).json({ message: 'Not Found' }));
+// 404 for everything else under /api
+app.use('/api/*', (req, res) => res.status(404).json({ message: 'API route not found' }));
 
-// Start listening
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`✅ Server started on port ${PORT}`);
-});
+// **DO NOT** call app.listen(); instead export your app for Vercel
+export default app;
