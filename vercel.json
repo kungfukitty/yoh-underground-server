@@ -1,11 +1,42 @@
 {
   "version": 2,
+
   "builds": [
     {
       "src": "server.js",
       "use": "@vercel/node"
     }
   ],
+
+  // Inject these headers at the platform level
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "http://www.yohunderground.fun"
+        },
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://www.yohunderground.fun"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type,Authorization"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        }
+      ]
+    }
+  ],
+
   "routes": [
     {
       "src": "/api/(.*)",
@@ -13,6 +44,8 @@
     }
   ]
 }
+
+
 
 
 
