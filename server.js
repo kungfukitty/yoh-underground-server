@@ -1,7 +1,7 @@
 // server.js
 import express from 'express';
-import cors    from 'cors';
-import dotenv  from 'dotenv';
+import cors from 'cors';
+import dotenv from 'dotenv';
 
 // Initialize Firebase Admin & Firestore
 import './config/firebaseAdminInit.js';
@@ -10,14 +10,21 @@ dotenv.config();
 const app = express();
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
-// Temporarily wide open; once we verify connectivity we’ll lock this down to your FreeHostia origin.
+const allowedOrigins = ['http://localhost:3000', 'http://www.yohunderground.fun', 'https://yoh-underground.vercel.app'];
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
   credentials: true
 }));
 app.options('*', cors());
+
 
 // ─── BODY PARSERS ───────────────────────────────────────────────────────────────
 app.use(express.json());
@@ -29,29 +36,29 @@ app.get('/api/ping', (req, res) => {
 });
 
 // ─── ROUTES ────────────────────────────────────────────────────────────────────
-import authRoutes      from './routes/authRoutes.js';
-import userRoutes      from './routes/userRoutes.js';
-import chatRoutes      from './routes/chatRoutes.js';
-import eventRoutes     from './routes/eventRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
+import eventRoutes from './routes/eventRoutes.js';
 import itineraryRoutes from './routes/itineraryRoutes.js';
-import memberRoutes    from './routes/memberRoutes.js';
-import networkRoutes   from './routes/networkRoutes.js';
-import referralRoutes  from './routes/referralRoutes.js';
-import resourceRoutes  from './routes/resourceRoutes.js';
-import securityRoutes  from './routes/securityRoutes.js';
-import villaRoutes     from './routes/villaRoutes.js';
+import memberRoutes from './routes/memberRoutes.js';
+import networkRoutes from './routes/networkRoutes.js';
+import referralRoutes from './routes/referralRoutes.js';
+import resourceRoutes from './routes/resourceRoutes.js';
+import securityRoutes from './routes/securityRoutes.js';
+import villaRoutes from './routes/villaRoutes.js';
 
-app.use('/api/auth',        authRoutes);
-app.use('/api/users',       userRoutes);
-app.use('/api/chat',        chatRoutes);
-app.use('/api/events',      eventRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/events', eventRoutes);
 app.use('/api/itineraries', itineraryRoutes);
-app.use('/api/members',     memberRoutes);
-app.use('/api/network',     networkRoutes);
-app.use('/api/referrals',   referralRoutes);
-app.use('/api/resources',   resourceRoutes);
-app.use('/api/security',    securityRoutes);
-app.use('/api/villas',      villaRoutes);
+app.use('/api/members', memberRoutes);
+app.use('/api/network', networkRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/resources', resourceRoutes);
+app.use('/api/security', securityRoutes);
+app.use('/api/villas', villaRoutes);
 
 // 404 handler for anything else under /api
 app.use('/api/*', (req, res) =>
