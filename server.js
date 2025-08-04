@@ -1,69 +1,52 @@
-// server.js
-import express from 'express';
-import cors from 'cors';
+// config/firebaseAdminInit.js
+import admin from 'firebase-admin';
+import { Storage } from '@google-cloud/storage';
 import dotenv from 'dotenv';
 
-// Initialize Firebase Admin & Firestore
-import './config/firebaseAdminInit.js';
-
 dotenv.config();
-const app = express();
 
-// ─── CORS ──────────────────────────────────────────────────────────────────────
-const allowedOrigins = ['http://localhost:3000', 'http://www.yohunderground.fun', 'https://yoh-underground.vercel.app'];
-app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
-  credentials: true
-}));
-app.options('*', cors());
+const serviceAccountString = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+const databaseURL = process.env.FIREBASE_DATABASE_URL;
 
+if (!serviceAccountString) {
+  console.error('FATAL: FIREBASE_SERVICE_ACCOUNT_KEY is not set!');
+  process.exit(1);
+}
+if (!databaseURL) {
+  console.error('FATAL: FIREBASE_DATABASE_URL is not set!');
+  process.exit(1);
+}
 
-// ─── BODY PARSERS ───────────────────────────────────────────────────────────────
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+let serviceAccount;
+try {
+  serviceAccount = JSON.parse(serviceAccountString);
+} catch (err) {
+  console.error('FATAL: Invalid JSON in FIREBASE_SERVICE_ACCOUNT_KEY:', err.message);
+  process.exit(1);
+}
 
-// ─── HEALTH CHECK ──────────────────────────────────────────────────────────────
-app.get('/api/ping', (req, res) => {
-  res.json({ ok: true, time: new Date().toISOString() });
-});
+let app;
+if (!admin.apps.length) {
+  app = admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: databaseURL
+  });
+  console.log('✅ Firebase Admin SDK initialized.');
+} else {
+  app = admin.app();
+  console.log('🔄 Firebase Admin SDK already initialized.');
+}
 
-// ─── ROUTES ────────────────────────────────────────────────────────────────────
-import authRoutes from './routes/authRoutes.js';
-import userRoutes from './routes/userRoutes.js';
-import chatRoutes from './routes/chatRoutes.js';
-import eventRoutes from './routes/eventRoutes.js';
-import itineraryRoutes from './routes/itineraryRoutes.js';
-import memberRoutes from './routes/memberRoutes.js';
-import networkRoutes from './routes/networkRoutes.js';
-import referralRoutes from './routes/referralRoutes.js';
-import resourceRoutes from './routes/resourceRoutes.js';
-import securityRoutes from './routes/securityRoutes.js';
-import villaRoutes from './routes/villaRoutes.js';
+const auth = app.auth();
+const db = app.firestore();
+const bucket = new Storage({
+  projectId: serviceAccount.project_id,
+  credentials: {
+    client_email: serviceAccount.client_email,
+    private_key: serviceAccount.private_key.replace(/\\n/g, '\n')
+  }
+}).bucket(`${serviceAccount.project_id}.appspot.com`);
+console.log('✅ Firebase Storage initialized.');
 
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/itineraries', itineraryRoutes);
-app.use('/api/members', memberRoutes);
-app.use('/api/network', networkRoutes);
-app.use('/api/referrals', referralRoutes);
-app.use('/api/resources', resourceRoutes);
-app.use('/api/security', securityRoutes);
-app.use('/api/villas', villaRoutes);
-
-// 404 handler for anything else under /api
-app.use('/api/*', (req, res) =>
-  res.status(404).json({ message: 'API route not found' })
-);
-
-// ─── EXPORT FOR VERCEL ─────────────────────────────────────────────────────────
-export default app;
+export const adminApp = app; // Export the initialized app as adminApp
+export { auth, db, bucket };
