@@ -2,29 +2,33 @@
 import express from 'express';
 import cors    from 'cors';
 import dotenv  from 'dotenv';
-import './config/firebaseAdminInit.js'; // initializes admin & db
+
+// Initialize Firebase Admin & Firestore
+import './config/firebaseAdminInit.js';
 
 dotenv.config();
-
 const app = express();
 
-// CORS: temporarily open to all origins for testing
-app.use(cors({ origin: true, credentials: true }));
+// ─── CORS ──────────────────────────────────────────────────────────────────────
+// Temporarily wide open; once we verify connectivity we’ll lock this down to your FreeHostia origin.
+app.use(cors({
+  origin: true,
+  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization'],
+  credentials: true
+}));
 app.options('*', cors());
 
-// Body parsing
+// ─── BODY PARSERS ───────────────────────────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health-check
+// ─── HEALTH CHECK ──────────────────────────────────────────────────────────────
 app.get('/api/ping', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
-// ────────────────────────────────────────────────────────────────────────────────
-// Mount routes (now that userController.js and checkNdaAccepted exist)
-
-// auth login/register
+// ─── ROUTES ────────────────────────────────────────────────────────────────────
 import authRoutes      from './routes/authRoutes.js';
 import userRoutes      from './routes/userRoutes.js';
 import chatRoutes      from './routes/chatRoutes.js';
@@ -49,9 +53,10 @@ app.use('/api/resources',   resourceRoutes);
 app.use('/api/security',    securityRoutes);
 app.use('/api/villas',      villaRoutes);
 
-// 404 for anything else under /api
-app.use('/api/*', (req, res) => res.status(404).json({ message: 'API route not found' }));
+// 404 handler for anything else under /api
+app.use('/api/*', (req, res) =>
+  res.status(404).json({ message: 'API route not found' })
+);
 
-// ────────────────────────────────────────────────────────────────────────────────
-// **For Vercel**, export the app instead of calling listen()
+// ─── EXPORT FOR VERCEL ─────────────────────────────────────────────────────────
 export default app;
