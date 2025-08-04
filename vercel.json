@@ -1,14 +1,11 @@
 {
   "version": 2,
-
   "builds": [
     {
       "src": "server.js",
       "use": "@vercel/node"
     }
   ],
-
-  // Inject these headers at the platform level
   "headers": [
     {
       "source": "/api/(.*)",
@@ -36,7 +33,6 @@
       ]
     }
   ],
-
   "routes": [
     {
       "src": "/api/(.*)",
@@ -44,8 +40,3 @@
     }
   ]
 }
-
-
-
-
-
