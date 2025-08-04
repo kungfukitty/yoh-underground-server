@@ -32,7 +32,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const payload = { id: userDoc.id };
+    const payload = {
+      id: userDoc.id,
+      isAdmin: userData.isAdmin || false,
+      isNDAAccepted: userData.isNDAAccepted || false
+    };
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
 
     res.json({ token });
