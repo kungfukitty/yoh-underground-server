@@ -1,21 +1,17 @@
 {
-  "headers": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/api/auth/login",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "//www.yohunderground.fun"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization"
-        }
-      ]
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/server.js"
     }
   ]
 }
+
+
