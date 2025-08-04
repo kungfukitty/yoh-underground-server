@@ -1,13 +1,13 @@
 {
-  "name": "yoh-underground-api",
-  "version": "1.0.0",
-  "description": "Express API for YOH Underground (Firebase-backed)",
+  "name": "yoh-underground-server",
+  "version": "1.0.4",
+  "description": "Express + Firebase API for YOH Underground",
   "main": "server.js",
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "build": "echo \"🛠️  No build step for API\""
+    "build": "echo \" No build step for server\""
   },
   "dependencies": {
     "@google-cloud/storage": "^7.11.0",
