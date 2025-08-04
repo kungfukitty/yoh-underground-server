@@ -10,31 +10,7 @@ dotenv.config();
 const app = express();
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
-const allowedOrigins = [
-    'http://www.yohunderground.fun',
-    'https://yoh-underground.vercel.app',
-    'http://localhost:3000'
-];
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
-};
-
-// Apply CORS middleware to all routes
-app.use(cors(corsOptions));
-
-// Explicitly handle preflight requests for all routes
-app.options('*', cors(corsOptions));
-
+app.use(cors());
 
 // ─── BODY PARSERS ───────────────────────────────────────────────────────────────
 app.use(express.json());
