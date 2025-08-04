@@ -41,7 +41,6 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ─── HEALTH CHECK ──────────────────────────────────────────────────────────────
-// Note: The path is now '/ping' not '/api/ping'
 app.get('/ping', (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
