@@ -1,3 +1,4 @@
+// middleware/authMiddleware.js
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -9,18 +10,22 @@ export const authenticateToken = (req, res, next) => {
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) return res.status(403).json({ message: 'Invalid token' });
-    req.user = user; // attach decoded payload
+    req.user = user;
     next();
   });
 };
 
-/**
- * New middleware to guard admin-only routes.
- * Assumes your JWT payload includes a `role` property.
- */
 export const checkAdmin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
     return next();
   }
   return res.status(403).json({ message: 'Admin access required' });
+};
+
+// ─── NEW: NDA middleware ───────────────────────────────────────────────────────
+export const checkNdaAccepted = (req, res, next) => {
+  // If you track NDA acceptance in the JWT payload:
+  // if (req.user && req.user.ndaAccepted) return next();
+  // Otherwise, we'll allow everyone through for now:
+  next();
 };
