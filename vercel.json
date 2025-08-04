@@ -6,17 +6,19 @@
       "use": "@vercel/node"
     }
   ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/server.js"
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "http://www.yohunderground.fun"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://www.yohunderground.fun"
+          "value": "//www.yohunderground.fun"
         },
         {
           "key": "Access-Control-Allow-Methods",
@@ -24,19 +26,13 @@
         },
         {
           "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type,Authorization"
+          "value": "Content-Type, Authorization"
         },
         {
           "key": "Access-Control-Allow-Credentials",
           "value": "true"
         }
       ]
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/server.js"
     }
   ]
 }
