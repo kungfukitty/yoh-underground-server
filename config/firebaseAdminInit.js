@@ -48,5 +48,5 @@ const bucket = new Storage({
 }).bucket(`${serviceAccount.project_id}.appspot.com`);
 console.log('✅ Firebase Storage initialized.');
 
-
-export { admin, auth, db, bucket };
+export const adminApp = app; // Export the initialized app as adminApp
+export { auth, db, bucket };
