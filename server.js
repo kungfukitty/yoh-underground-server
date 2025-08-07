@@ -10,6 +10,8 @@ dotenv.config();
 const app = express();
 
 // ─── CORS ──────────────────────────────────────────────────────────────────────
+// FIX: In production, you should restrict this to your frontend's domain.
+// For example: app.use(cors({ origin: 'https://your-frontend-app.com' }));
 app.use(cors());
 
 // ─── BODY PARSERS ───────────────────────────────────────────────────────────────
@@ -22,7 +24,6 @@ app.get('/ping', (req, res) => {
 });
 
 // ─── ROUTES ────────────────────────────────────────────────────────────────────
-// Vercel's vercel.json handles the /api prefix. We remove it from the routes here.
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
@@ -51,6 +52,13 @@ app.use('/villas', villaRoutes);
 app.use((req, res, next) => {
   res.status(404).json({ message: `Route not found: ${req.originalUrl}` });
 });
+
+// FIX: Added a generic error handler for any unhandled errors in the routes.
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: 'An internal server error occurred.' });
+});
+
 
 // ─── EXPORT FOR VERCEL ─────────────────────────────────────────────────────────
 export default app;
