@@ -6,6 +6,15 @@ import { db } from '../config/firebaseAdminInit.js';
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// FIX: Recommendation: Implement rate limiting to prevent brute-force attacks.
+// import rateLimit from 'express-rate-limit';
+// const loginLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 10, // limit each IP to 10 requests per windowMs
+//   message: 'Too many login attempts from this IP, please try again after 15 minutes'
+// });
+// router.post('/login', loginLimiter, async (req, res) => { ... });
+
 // POST /api/auth/login
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -37,7 +46,10 @@ router.post('/login', async (req, res) => {
       isAdmin: userData.isAdmin || false,
       isNDAAccepted: userData.isNDAAccepted || false
     };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+    
+    // FIX: The JWT expiration is now configurable via an environment variable.
+    const expiresIn = process.env.JWT_EXPIRATION || '1h';
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn });
 
     res.json({ token });
   } catch (err) {
