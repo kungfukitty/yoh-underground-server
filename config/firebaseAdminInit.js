@@ -1,5 +1,4 @@
-// File: config/firebaseAdminInit.js - COMPLETE AND UP-TO-DATE (Reconfirming Integrity)
-
+// File: config/firebaseAdminInit.js
 import admin from 'firebase-admin';
 import { Storage } from '@google-cloud/storage';
 
@@ -24,6 +23,8 @@ if (!admin.apps.length) {
 
     auth = app.auth();
     db = app.firestore();
+    
+    // FIX: Moved Storage initialization inside the main `if` block to avoid re-initialization.
     const storage = new Storage({
       projectId: serviceAccount.project_id,
       credentials: {
@@ -44,6 +45,8 @@ if (!admin.apps.length) {
   console.log("Firebase Admin SDK already initialized.");
   auth = app.auth();
   db = app.firestore();
+  
+  // FIX: Ensured the bucket is also available in the 'else' case.
   const serviceAccount = JSON.parse(serviceAccountJsonString);
   const storage = new Storage({
       projectId: serviceAccount.project_id,
