@@ -7,11 +7,6 @@ const router = Router();
 // All event routes require a user to be authenticated and to have accepted the NDA.
 router.use(authenticateToken, checkNdaAccepted);
 
-/**
- * Helper to format Firestore Timestamps into ISO strings.
- * @param {object} data - The document data from Firestore.
- * @returns {object} - The document data with timestamps converted.
- */
 const formatEventTimestamps = (data) => {
     return {
         ...data,
@@ -46,33 +41,49 @@ router.get('/', async (req, res) => {
 router.post('/:eventId/rsvp', async (req, res) => {
     const { eventId } = req.params;
     const userId = req.user.id;
+    const eventRef = db.collection('events').doc(eventId);
 
     try {
-        const eventRef = db.collection('events').doc(eventId);
-        const eventDoc = await eventRef.get();
+        // FIX: Using a Firestore transaction to prevent a race condition
+        // where two users might RSVP for the last spot simultaneously.
+        await db.runTransaction(async (transaction) => {
+            const eventDoc = await transaction.get(eventRef);
 
-        if (!eventDoc.exists) {
-            return res.status(404).json({ message: 'Event not found.' });
-        }
+            if (!eventDoc.exists) {
+                // Throw an error to abort the transaction.
+                throw new Error('Event not found.');
+            }
 
-        const eventData = eventDoc.data();
-        const attendees = eventData.attendees || [];
+            const eventData = eventDoc.data();
+            const attendees = eventData.attendees || [];
 
-        if (attendees.includes(userId)) {
-            return res.status(409).json({ message: 'You have already RSVPd for this event.' });
-        }
+            if (attendees.includes(userId)) {
+                // This will be caught and sent as a 409 response.
+                throw new Error('Already RSVPd.');
+            }
 
-        if (eventData.maxCapacity && attendees.length >= eventData.maxCapacity) {
-            return res.status(409).json({ message: 'This event is currently full.' });
-        }
-
-        await eventRef.update({
-            attendees: adminApp.firestore.FieldValue.arrayUnion(userId)
+            if (eventData.maxCapacity && attendees.length >= eventData.maxCapacity) {
+                // This will be caught and sent as a 409 response.
+                throw new Error('Event is full.');
+            }
+            
+            transaction.update(eventRef, {
+                attendees: adminApp.firestore.FieldValue.arrayUnion(userId)
+            });
         });
 
         res.status(200).json({ message: 'RSVP successful!' });
     } catch (error) {
         console.error(`Error processing RSVP for event ${eventId}:`, error);
+        if (error.message === 'Event not found.') {
+            return res.status(404).json({ message: 'Event not found.' });
+        }
+        if (error.message === 'Already RSVPd.') {
+            return res.status(409).json({ message: 'You have already RSVPd for this event.' });
+        }
+        if (error.message === 'Event is full.') {
+            return res.status(409).json({ message: 'This event is currently full.' });
+        }
         res.status(500).json({ message: 'Server error processing RSVP.' });
     }
 });
